@@ -95,8 +95,8 @@ grabtext logs --clear              # Limpar arquivo de log
 
 # Opções de Depuração
 grabtext --debug                   # Ativar modo de depuração com saída detalhada
-grabtext --verbose                  # Mostrar informações detalhadas de progresso
-grabtext --dry-run                  # Mostrar o que seria feito sem executar
+grabtext --verbose                 # Mostrar informações detalhadas de progresso
+grabtext --dry-run                 # Mostrar o que seria feito sem executar
 ```
 
 ---
