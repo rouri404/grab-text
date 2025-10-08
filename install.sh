@@ -73,7 +73,7 @@ INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Create launch script
 cat > launch.sh << EOLSCRIPT
 #!/bin/bash
-INSTALL_DIR="/home/gabriel/GrabText"
+INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_EXEC="${INSTALL_DIR}/.venv/bin/python"
 GRABTEXT_SCRIPT="${INSTALL_DIR}/grabtext.py"
 
@@ -184,7 +184,7 @@ success "$MSG_LAUNCH_SCRIPT_CREATED"
 info "$MSG_CREATING_CLI_COMMAND"
 mkdir -p "$HOME/.local/bin"
 GRABTEXT_CLI="$HOME/.local/bin/grabtext"
-ln -sf "$PWD/launch.sh" "$GRABTEXT_CLI"
+ln -sf "$INSTALL_DIR/launch.sh" "$GRABTEXT_CLI"
 
 # Add ~/.local/bin to PATH if not already present
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
@@ -212,19 +212,6 @@ else
     success "Todos os arquivos necessários foram criados."
 fi
 
-escape_path_with_single_quotes() {
-  local IFS='/'
-  read -ra parts <<< "$1"
-  local escaped_path=""
-  for part in "${parts[@]}"; do
-    if [[ "$part" =~ [[:space:]] ]]; then
-      escaped_path+="/'$part'"
-    else
-      escaped_path+="/$part"
-    fi
-  done
-  echo "${escaped_path#/}"
-}
 
 echo ""
 success "$MSG_INSTALL_COMPLETE"
@@ -243,7 +230,7 @@ Type=Application
 Name=GrabText
 Comment=Text extraction tool for Linux
 Comment[pt]=Ferramenta de extração de texto para Linux
-Exec=$PWD/launch.sh grab
+Exec=$INSTALL_DIR/launch.sh grab
 Icon=document-save-as
 Terminal=false
 StartupNotify=true
@@ -277,7 +264,7 @@ case "$SESSION_TYPE" in
             dconf reset -f /org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/grabtext/ &> /dev/null || true
             gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['$KEY_PATH']" &> /dev/null && \
             gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$KEY_PATH name 'GrabText' &> /dev/null && \
-            gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$KEY_PATH command "$PWD/launch.sh grab" &> /dev/null && \
+            gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$KEY_PATH command "$INSTALL_DIR/launch.sh grab" &> /dev/null && \
             gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$KEY_PATH binding 'Insert' &> /dev/null && \
             success "$MSG_SHORTCUT_SUCCESS" || warning "$MSG_SHORTCUT_FAIL"
         else
@@ -288,7 +275,7 @@ case "$SESSION_TYPE" in
         info "$MSG_ATTEMPT_XFCE_SHORTCUT"
         if command -v xfconf-query > /dev/null; then
             xfconf-query -c xfce4-keyboard-shortcuts -p /commands/custom/Insert -r &> /dev/null || true
-            if xfconf-query -c xfce4-keyboard-shortcuts -p /commands/custom/Insert -n -t string -s "$PWD/launch.sh grab"; then
+            if xfconf-query -c xfce4-keyboard-shortcuts -p /commands/custom/Insert -n -t string -s "$INSTALL_DIR/launch.sh grab"; then
                 success "$MSG_SHORTCUT_SUCCESS"
             else
                 warning "$MSG_SHORTCUT_FAIL"
@@ -303,7 +290,7 @@ case "$SESSION_TYPE" in
             # Remove atalho existente se houver
             kwriteconfig5 --file kglobalshortcutsrc --group "GrabText" --delete &> /dev/null || true
             # Adicionar novo atalho
-            kwriteconfig5 --file kglobalshortcutsrc --group "GrabText" --key "Grab Text" "$PWD/launch.sh grab,none,Grab Text" && \
+            kwriteconfig5 --file kglobalshortcutsrc --group "GrabText" --key "Grab Text" "$INSTALL_DIR/launch.sh grab,none,Grab Text" && \
             kwriteconfig5 --file kglobalshortcutsrc --group "GrabText" --key "_k_friendly_name" "GrabText" && \
             kwriteconfig5 --file kglobalshortcutsrc --group "GrabText" --key "_launch" "Insert,none,GrabText" && \
             success "$MSG_SHORTCUT_SUCCESS" || warning "$MSG_SHORTCUT_FAIL"
