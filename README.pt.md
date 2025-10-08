@@ -1,7 +1,7 @@
 <div align="center">
   <h1>GrabText</h1>
   <p>
-    <img src="https://img.shields.io/badge/version-1.3.0-blue" alt="Version">
+    <img src="https://img.shields.io/badge/version-1.3.1-blue" alt="Version">
     <img src="https://img.shields.io/badge/Platform-Linux-lightgrey" alt="Platform">
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
     <img src="https://img.shields.io/badge/status-ativo-success" alt="Status">
@@ -32,34 +32,59 @@ Utiliza o **Tesseract** para o reconhecimento de caracteres e o **Flameshot** pa
 *   **OCR Multilíngue:** Suporte robusto para reconhecimento de texto em inglês (`en`) e português (`pt`).
 *   **Captura de Tela Intuitiva:** Utilize a interface do Flameshot para selecionar facilmente a área desejada da tela.
 *   **Cópia Instantânea:** O texto reconhecido é automaticamente copiado para a área de transferência.
-*   **Configuração Flexível:** Alterne o idioma do OCR usando uma variável de ambiente, conforme sua necessidade.
+*   **Configuração Flexível:** Alterne o idioma do OCR usando arquivo de configuração ou comandos CLI.
 *   **Registro de Atividades:** Geração de logs detalhados para facilitar a depuração.
+*   **Comportamento Padrão:** Executar `grabtext` sem argumentos captura área da tela automaticamente.
 
 ### Funcionalidades da Linha de Comando
+*   **Captura de Tela:** Captura intuitiva de texto de áreas da tela
 *   **Processamento de Imagens:** Processe imagens individuais ou diretórios inteiros
-*   **Processamento em Lote:** Manipule múltiplas imagens de uma vez
 *   **Monitoramento de Diretórios:** Observe pastas por novas imagens para processar
 *   **Múltiplos Formatos de Saída:** Suporte para saídas em texto, JSON e CSV
 *   **Gerenciamento Avançado de Logs:** Filtre, exporte e analise arquivos de log
+*   **Status do Sistema:** Verifique dependências e configuração
+*   **Processamento em Lote:** Manipule múltiplas imagens eficientemente
 
 ## Uso da Linha de Comando
 
+A CLI do GrabText está organizada em comandos principais e comandos de utilidade para melhor usabilidade:
+
+### Comandos Principais
+
 ```bash
-# Obtendo Ajuda
-grabtext help                      # Mostrar ajuda geral
-grabtext grab --help               # Mostrar ajuda do comando grab
-grabtext logs --help               # Mostrar ajuda do comando logs
-
-# Uso Básico
-grabtext grab                      # Capturar área da tela e extrair texto
+# Captura de Tela (Comportamento Padrão)
+grabtext                           # Capturar área da tela e extrair texto (padrão)
+grabtext grab                      # Mesmo que acima, comando explícito
 grabtext grab -l en                # Usar OCR em inglês
-grabtext grab -i imagem.png        # Processar imagem existente
 grabtext grab -o saida.txt         # Salvar saída em arquivo
+grabtext grab --no-clipboard       # Não copiar para área de transferência
+grabtext grab --dry-run            # Mostrar o que seria feito
 
-# Processamento Avançado de Imagens
-grabtext grab -i ./imagens -r      # Processar diretório recursivamente
-grabtext grab -i ./imagens -f json # Saída em formato JSON
-grabtext grab --watch ./imagens    # Monitorar diretório por novas imagens
+# Processar Arquivos Existentes
+grabtext process imagem.png        # Processar imagem única
+grabtext process ./imagens -r      # Processar diretório recursivamente
+grabtext process ./imagens -f json # Saída em formato JSON
+grabtext process ./imagens --batch # Processar múltiplas imagens
+
+# Monitorar Diretórios
+grabtext monitor ./imagens         # Monitorar diretório por novas imagens
+grabtext monitor ./imagens -r      # Monitorar recursivamente
+grabtext monitor ./imagens -f csv  # Saída em formato CSV
+```
+
+### Comandos de Utilidade
+
+```bash
+# Informações do Sistema
+grabtext status                    # Mostrar status do sistema e dependências
+grabtext config                    # Mostrar configuração atual
+grabtext version                   # Exibir informações de versão
+grabtext help                      # Mostrar ajuda geral
+
+# Gerenciamento de Idioma
+grabtext get-lang                  # Mostrar idioma atual
+grabtext set-lang en               # Definir idioma para inglês
+grabtext set-lang pt               # Definir idioma para português
 
 # Gerenciamento de Logs
 grabtext logs --tail 10            # Mostrar últimas 10 entradas do log
@@ -70,10 +95,8 @@ grabtext logs --clear              # Limpar arquivo de log
 
 # Opções de Depuração
 grabtext --debug                   # Ativar modo de depuração com saída detalhada
-grabtext --verbose                 # Mostrar informações detalhadas de progresso
-grabtext grab --dry-run            # Mostrar o que seria feito sem executar
-grabtext --version                 # Exibir informações de versão
-grabtext --config                  # Mostrar configuração atual
+grabtext --verbose                  # Mostrar informações detalhadas de progresso
+grabtext --dry-run                  # Mostrar o que seria feito sem executar
 ```
 
 ---
@@ -108,6 +131,37 @@ Este projeto foi desenvolvido e testado para funcionar nos principais ambientes 
     O script irá pedir sua senha para instalar os pacotes de sistema (se ainda não estiverem instalados) e irá configurar o restante do ambiente.
 
 ---
+
+## Novos Comandos na v1.3.0
+
+### Status do Sistema (`grabtext status`)
+Verifique dependências do sistema, ambiente Python e configuração:
+```bash
+grabtext status                    # Mostrar status completo do sistema
+```
+
+### Configuração (`grabtext config`)
+Exibir configuração atual e variáveis de ambiente:
+```bash
+grabtext config                    # Mostrar configuração detalhada
+```
+
+### Comando Process (`grabtext process`)
+Processar imagens ou diretórios existentes com opções avançadas:
+```bash
+grabtext process imagem.png        # Processar imagem única
+grabtext process ./imagens -r      # Processar diretório recursivamente
+grabtext process ./imagens -f json # Saída em formato JSON
+grabtext process ./imagens --batch # Processar múltiplas imagens
+```
+
+### Comando Monitor (`grabtext monitor`)
+Monitorar diretórios por novas imagens e processá-las automaticamente:
+```bash
+grabtext monitor ./imagens         # Monitorar diretório
+grabtext monitor ./imagens -r      # Monitorar recursivamente
+grabtext monitor ./imagens -f csv  # Saída em formato CSV
+```
 
 ## Variáveis de Ambiente
 

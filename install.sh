@@ -44,8 +44,20 @@ success "$MSG_DEPS_INSTALLED"
 
 info "$MSG_SETUP_PYTHON_ENV"
 python3 -m venv .venv || error "$MSG_VENV_FAIL"
+./.venv/bin/pip install --upgrade pip || error "$MSG_PIP_FAIL"
 ./.venv/bin/pip install -r requirements.txt || error "$MSG_PIP_FAIL"
 success "$MSG_PYTHON_DEPS_INSTALLED"
+
+# Create initial configuration file
+info "Criando arquivo de configuração inicial..."
+cat > .grabtext_config << EOLCONFIG
+language=pt
+EOLCONFIG
+if [ -f ".grabtext_config" ]; then
+    success "Arquivo de configuração criado."
+else
+    warning "Falha ao criar arquivo de configuração."
+fi
 
 CONFIG_DIR="$HOME/.config/flameshot"
 info "$MSG_CONFIG_FLAMESHOT"
@@ -61,34 +73,32 @@ INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Create launch script
 cat > launch.sh << EOLSCRIPT
 #!/bin/bash
-INSTALL_DIR="${INSTALL_DIR}"
-PYTHON_EXEC="\${INSTALL_DIR}/.venv/bin/python"
-GRABTEXT_SCRIPT="\${INSTALL_DIR}/grabtext.py"
+INSTALL_DIR="/home/gabriel/GrabText"
+PYTHON_EXEC="${INSTALL_DIR}/.venv/bin/python"
+GRABTEXT_SCRIPT="${INSTALL_DIR}/grabtext.py"
 
-# Set language
-DETECTED_LANG=\$(echo \$LANG | cut -d'.' -f1 | cut -d'_' -f1 | tr '[:upper:]' '[:lower:]')
-export GRABTEXT_LANG="${GRABTEXT_LANG:-\${DETECTED_LANG:-pt}}"
+# Language will be determined by the Python script from .grabtext_config file
 
 # Set path to include common locations for required tools
-export PATH=/usr/bin:/bin:/usr/local/bin:/usr/sbin:/sbin:\$HOME/.local/bin:\$PATH
+export PATH=/usr/bin:/bin:/usr/local/bin:/usr/sbin:/sbin:$HOME/.local/bin:$PATH
 
 # Check for GUI environment and tools
 has_display() {
     # First check if DISPLAY is set
-    [ -n "\$DISPLAY" ] || return 1
+    [ -n "$DISPLAY" ] || return 1
     
     # Then check if we can query X server
     if command -v xdpyinfo >/dev/null 2>&1; then
         xdpyinfo >/dev/null 2>&1
-        return \$?
+        return $?
     elif command -v xhost >/dev/null 2>&1; then
         xhost >/dev/null 2>&1
-        return \$?
+        return $?
     fi
     
     # If no X tools available, check Wayland
-    [ -n "\$WAYLAND_DISPLAY" ]
-    return \$?
+    [ -n "$WAYLAND_DISPLAY" ]
+    return $?
 }
 
 has_gui_tools() {
@@ -99,36 +109,36 @@ has_gui_tools() {
 }
 
 # Debug information (if needed)
-if [ "\$1" = "--debug" ]; then
-    echo "Install directory: \$INSTALL_DIR"
-    echo "Python executable: \$PYTHON_EXEC"
-    echo "Script path: \$GRABTEXT_SCRIPT"
-    echo "Current directory: \$(pwd)"
-    echo "Display available: \$(has_display && echo 'yes' || echo 'no')"
+if [ "$1" = "--debug" ]; then
+    echo "Install directory: $INSTALL_DIR"
+    echo "Python executable: $PYTHON_EXEC"
+    echo "Script path: $GRABTEXT_SCRIPT"
+    echo "Current directory: $(pwd)"
+    echo "Display available: $(has_display && echo 'yes' || echo 'no')"
     exit 0
 fi
 
 # Check installation directory
-if [ ! -d "\$INSTALL_DIR" ]; then
-    notify-send "GrabText Error" "Installation directory not found: \$INSTALL_DIR"
+if [ ! -d "$INSTALL_DIR" ]; then
+    notify-send "GrabText Error" "Installation directory not found: $INSTALL_DIR"
     exit 1
 fi
 
 # Check required files
-if [ ! -f "\$PYTHON_EXEC" ]; then
+if [ ! -f "$PYTHON_EXEC" ]; then
     notify-send "GrabText Error" "Python environment not found. Try reinstalling GrabText."
-    echo "Missing: \$PYTHON_EXEC" >&2
+    echo "Missing: $PYTHON_EXEC" >&2
     exit 1
 fi
 
-if [ ! -f "\$GRABTEXT_SCRIPT" ]; then
+if [ ! -f "$GRABTEXT_SCRIPT" ]; then
     notify-send "GrabText Error" "Script not found. Try reinstalling GrabText."
-    echo "Missing: \$GRABTEXT_SCRIPT" >&2
+    echo "Missing: $GRABTEXT_SCRIPT" >&2
     exit 1
 fi
 
 # Execute command
-if [ "\$1" = "grab" ] || [ "\$1" = "--gui" ]; then
+if [ "$1" = "grab" ] || [ "$1" = "--gui" ]; then
     # Check GUI requirements
     if ! has_display; then
         echo "Error: No display available. X11 or Wayland is required for GUI operations." >&2
@@ -141,28 +151,28 @@ if [ "\$1" = "grab" ] || [ "\$1" = "--gui" ]; then
     fi
 
     # GUI Mode - Use temporary file to handle the screenshot
-    TEMP_IMG=\$(mktemp -t grabtext-XXXXXX.png)
+    TEMP_IMG=$(mktemp -t grabtext-XXXXXX.png)
     cleanup() {
-        rm -f "\$TEMP_IMG"
+        rm -f "$TEMP_IMG"
     }
     trap cleanup EXIT
 
     # Capture screenshot to temp file
-    if flameshot gui --raw > "\$TEMP_IMG"; then
-        if [ -s "\$TEMP_IMG" ]; then  # Check if file is not empty
+    if flameshot gui --raw > "$TEMP_IMG"; then
+        if [ -s "$TEMP_IMG" ]; then  # Check if file is not empty
             # Process the image with Python
-            "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT" grab -i "\$TEMP_IMG" --clipboard
+            "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" grab -i "$TEMP_IMG" --clipboard
         else
             echo "No image captured." >&2
             exit 1
         fi
     fi
-elif [ -z "\$1" ]; then
+elif [ -z "$1" ]; then
     # No arguments - show help
-    "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT" help
+    "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" help
 else
     # CLI Mode - pass all arguments
-    "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT" "\$@"
+    "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" "$@"
 fi
 EOLSCRIPT
 
@@ -187,6 +197,21 @@ chmod +x grabtext.py
 chmod +x launch.sh
 success "$MSG_PERMISSIONS_ADJUSTED"
 
+# Verify installation
+info "Verificando instalação..."
+MISSING_FILES=""
+[ ! -f "grabtext.py" ] && MISSING_FILES="$MISSING_FILES grabtext.py"
+[ ! -f "launch.sh" ] && MISSING_FILES="$MISSING_FILES launch.sh"
+[ ! -f ".grabtext_config" ] && MISSING_FILES="$MISSING_FILES .grabtext_config"
+[ ! -d ".venv" ] && MISSING_FILES="$MISSING_FILES .venv"
+[ ! -f ".venv/bin/python" ] && MISSING_FILES="$MISSING_FILES .venv/bin/python"
+
+if [ -n "$MISSING_FILES" ]; then
+    error "Arquivos faltando na instalação:$MISSING_FILES"
+else
+    success "Todos os arquivos necessários foram criados."
+fi
+
 escape_path_with_single_quotes() {
   local IFS='/'
   read -ra parts <<< "$1"
@@ -209,7 +234,31 @@ info "$MSG_AUTO_SHORTCUT_SETUP"
 info "$MSG_DESKTOP_FILE_SETUP"
 APPS_DIR="$HOME/.local/share/applications"
 mkdir -p "$APPS_DIR"
-cp "./grabtext.desktop" "$APPS_DIR/" || warning "$MSG_DESKTOP_FILE_COPY_FAIL"
+
+# Create .desktop file with correct path
+cat > "$APPS_DIR/grabtext.desktop" << EOLDESKTOP
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=GrabText
+Comment=Text extraction tool for Linux
+Comment[pt]=Ferramenta de extração de texto para Linux
+Exec=$PWD/launch.sh grab
+Icon=document-save-as
+Terminal=false
+StartupNotify=true
+Categories=Graphics;Photography;Utility;
+Keywords=OCR;text;extraction;screenshot;tesseract;
+Keywords[pt]=OCR;texto;extração;captura;tesseract;
+MimeType=image/png;image/jpeg;image/jpg;
+StartupWMClass=GrabText
+EOLDESKTOP
+
+if [ -f "$APPS_DIR/grabtext.desktop" ]; then
+    success "Arquivo .desktop criado com sucesso"
+else
+    warning "$MSG_DESKTOP_FILE_COPY_FAIL"
+fi
 
 # Detect desktop environment
 SESSION_TYPE="unknown"

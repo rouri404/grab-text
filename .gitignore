@@ -2,20 +2,75 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 .venv/
 venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
 
 # Editor/IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 .vim/
 *.sublime-workspace
 *.sublime-project
+.atom/
+.brackets.json
+.editorconfig
 
 # Logs e arquivos temporários
 *.log
@@ -23,14 +78,22 @@ grabtext.log
 *.tmp
 *.temp
 *.bak
+*.backup
+*.orig
+*.rej
 
 # Arquivos gerados durante a instalação/execução
 launch.sh
 grabtext.desktop
 flameshot.ini.bak
 
-# Sistema
+# Sistema operacional
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 *.directory
 .Trash-*
@@ -42,3 +105,52 @@ Thumbs.db
 # Arquivos específicos do projeto
 temp_screenshot_*.png
 grabtext-*.png
+screenshot_*.png
+capture_*.png
+
+# Arquivos de configuração local
+config.local
+settings.local
+.env
+.env.local
+.env.*.local
+.grabtext_config
+
+# Arquivos de teste
+test_images/
+test_output/
+test_results/
+
+# Arquivos de backup
+*.backup
+*.old
+*.bak
+*.swp
+*.swo
+
+# Arquivos de cache
+.cache/
+*.cache
+
+# Arquivos de lock
+*.lock
+*.pid
+
+# Arquivos de log específicos
+*.log.*
+logs/
+log/
+
+# Arquivos de saída
+output/
+outputs/
+results/
+*.out
+
+# Arquivos de imagem temporários
+temp_*.png
+temp_*.jpg
+temp_*.jpeg
+tmp_*.png
+tmp_*.jpg
+tmp_*.jpeg

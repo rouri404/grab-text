@@ -1,7 +1,7 @@
 <div align="center">
   <h1>GrabText</h1>
   <p>
-    <img src="https://img.shields.io/badge/version-1.3.0-blue" alt="Version">
+    <img src="https://img.shields.io/badge/version-1.3.1-blue" alt="Version">
     <img src="https://img.shields.io/badge/Platform-Linux-lightgrey" alt="Platform">
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
     <img src="https://img.shields.io/badge/status-active-success" alt="Status">
@@ -32,34 +32,59 @@ It utilizes **Tesseract** for character recognition and **Flameshot** for intuit
 *   **Multilingual OCR:** Robust support for text recognition in English (`en`) and Portuguese (`pt`).
 *   **Intuitive Screen Capture:** Use the Flameshot interface to easily select the desired screen area.
 *   **Instant Copy:** Recognized text is automatically copied to the clipboard.
-*   **Flexible Configuration:** Switch the OCR language using an environment variable, as needed.
+*   **Flexible Configuration:** Switch the OCR language using configuration file or CLI commands.
 *   **Activity Logging:** Detailed logs are generated to facilitate debugging.
+*   **Default Behavior:** Running `grabtext` without arguments captures screen area automatically.
 
 ### CLI Features
+*   **Screen Capture:** Intuitive text capture from screen areas
 *   **Image Processing:** Process single images or entire directories
-*   **Batch Processing:** Handle multiple images at once
 *   **Directory Monitoring:** Watch folders for new images to process
 *   **Multiple Output Formats:** Support for text, JSON, and CSV outputs
 *   **Advanced Log Management:** Filter, export, and analyze log files
+*   **System Status:** Check dependencies and configuration
+*   **Batch Processing:** Handle multiple images efficiently
 
 ## CLI Usage
 
+The GrabText CLI is organized into main commands and utility commands for better usability:
+
+### Main Commands
+
 ```bash
-# Getting Help
-grabtext help                     # Show general help
-grabtext grab --help              # Show help for grab command
-grabtext logs --help              # Show help for logs command
-
-# Basic Usage
-grabtext grab                     # Capture screen area and extract text
+# Screen Capture (Default Behavior)
+grabtext                          # Capture screen area and extract text (default)
+grabtext grab                     # Same as above, explicit command
 grabtext grab -l en               # Use English OCR
-grabtext grab -i image.png        # Process existing image
 grabtext grab -o output.txt       # Save output to file
+grabtext grab --no-clipboard      # Don't copy to clipboard
+grabtext grab --dry-run           # Show what would be done
 
-# Advanced Image Processing
-grabtext grab -i ./images -r      # Process directory recursively
-grabtext grab -i ./images -f json # Output in JSON format
-grabtext grab --watch ./images    # Monitor directory for new images
+# Process Existing Files
+grabtext process image.png        # Process single image
+grabtext process ./images -r      # Process directory recursively
+grabtext process ./images -f json # Output in JSON format
+grabtext process ./images --batch # Process multiple images
+
+# Monitor Directories
+grabtext monitor ./images         # Monitor directory for new images
+grabtext monitor ./images -r      # Monitor recursively
+grabtext monitor ./images -f csv  # Output in CSV format
+```
+
+### Utility Commands
+
+```bash
+# System Information
+grabtext status                   # Show system status and dependencies
+grabtext config                   # Show current configuration
+grabtext version                  # Display version information
+grabtext help                     # Show general help
+
+# Language Management
+grabtext get-lang                 # Show current language
+grabtext set-lang en              # Set language to English
+grabtext set-lang pt              # Set language to Portuguese
 
 # Log Management
 grabtext logs --tail 10           # Show last 10 log entries
@@ -71,9 +96,7 @@ grabtext logs --clear             # Clear log file
 # Debugging Options
 grabtext --debug                  # Enable debug mode with verbose output
 grabtext --verbose                # Show detailed progress information
-grabtext grab --dry-run           # Show what would be done without executing
-grabtext --version                # Display version information
-grabtext --config                 # Show current configuration
+grabtext --dry-run                # Show what would be done without executing
 ```
 
 ---
@@ -108,6 +131,37 @@ This project was developed and tested to work on major Linux desktop environment
     The script will ask for your password to install system packages (if not already installed) and configure the rest of the environment.
 
 ---
+
+## New Commands in v1.3.0
+
+### System Status (`grabtext status`)
+Check system dependencies, Python environment, and configuration:
+```bash
+grabtext status                   # Show complete system status
+```
+
+### Configuration (`grabtext config`)
+Display current configuration and environment variables:
+```bash
+grabtext config                   # Show detailed configuration
+```
+
+### Process Command (`grabtext process`)
+Process existing images or directories with advanced options:
+```bash
+grabtext process image.png        # Process single image
+grabtext process ./images -r      # Process directory recursively
+grabtext process ./images -f json # Output in JSON format
+grabtext process ./images --batch # Process multiple images
+```
+
+### Monitor Command (`grabtext monitor`)
+Monitor directories for new images and process them automatically:
+```bash
+grabtext monitor ./images         # Monitor directory
+grabtext monitor ./images -r      # Monitor recursively
+grabtext monitor ./images -f csv  # Output in CSV format
+```
 
 ## Environment Variables
 
