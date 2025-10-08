@@ -132,7 +132,7 @@ This project was developed and tested to work on major Linux desktop environment
 
 ---
 
-## New Commands in v1.3.0
+## New Commands
 
 ### System Status (`grabtext status`)
 Check system dependencies, Python environment, and configuration:

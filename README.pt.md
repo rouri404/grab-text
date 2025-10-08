@@ -132,7 +132,7 @@ Este projeto foi desenvolvido e testado para funcionar nos principais ambientes 
 
 ---
 
-## Novos Comandos na v1.3.0
+## Novos Comandos
 
 ### Status do Sistema (`grabtext status`)
 Verifique dependências do sistema, ambiente Python e configuração:
