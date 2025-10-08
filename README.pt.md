@@ -45,6 +45,11 @@ Utiliza o **Tesseract** para o reconhecimento de caracteres e o **Flameshot** pa
 ## Uso da Linha de Comando
 
 ```bash
+# Obtendo Ajuda
+grabtext help                      # Mostrar ajuda geral
+grabtext grab --help               # Mostrar ajuda do comando grab
+grabtext logs --help               # Mostrar ajuda do comando logs
+
 # Uso Básico
 grabtext grab                      # Capturar área da tela e extrair texto
 grabtext grab -l en                # Usar OCR em inglês
@@ -62,6 +67,13 @@ grabtext logs --since 2023-10-01   # Mostrar logs desde 1º de outubro
 grabtext logs --errors             # Mostrar apenas erros
 grabtext logs --export logs.txt    # Exportar logs para arquivo
 grabtext logs --clear              # Limpar arquivo de log
+
+# Opções de Depuração
+grabtext --debug                   # Ativar modo de depuração com saída detalhada
+grabtext --verbose                # Mostrar informações detalhadas de progresso
+grabtext grab --dry-run           # Mostrar o que seria feito sem executar
+grabtext --version               # Exibir informações de versão
+grabtext --config                # Mostrar configuração atual
 ```
 
 ---
@@ -96,6 +108,40 @@ Este projeto foi desenvolvido e testado para funcionar nos principais ambientes 
     O script irá pedir sua senha para instalar os pacotes de sistema (se ainda não estiverem instalados) e irá configurar o restante do ambiente.
 
 ---
+
+## Variáveis de Ambiente
+
+As seguintes variáveis de ambiente podem ser usadas para configurar o GrabText:
+
+*   `GRABTEXT_LANG`: Define o idioma padrão do OCR (`en` ou `pt`)
+*   `GRABTEXT_LOG`: Define localização personalizada do arquivo de log (padrão: `~/.local/share/grabtext/grabtext.log`)
+*   `GRABTEXT_NO_NOTIFY`: Desativa notificações do desktop quando definido como `1`
+
+## Solução de Problemas
+
+Problemas comuns e soluções:
+
+1.  **OCR não funciona corretamente:**
+    - Certifique-se que a imagem tem bom contraste e não está borrada
+    - Tente mudar o idioma do OCR com a flag `-l`
+    - Verifique se o tesseract está instalado corretamente
+
+2.  **Comando não encontrado:**
+    - Verifique se `~/.local/bin` está no seu PATH
+    - Tente executar `source ~/.bashrc` ou reinicie seu terminal
+    - Execute novamente o script de instalação
+
+3.  **Captura GUI não funciona:**
+    - Verifique se o Flameshot está instalado e em execução
+    - Certifique-se de estar em um ambiente gráfico
+    - Tente reiniciar o serviço do Flameshot
+
+4.  **Logs não aparecem:**
+    - Verifique o arquivo de log em `~/.local/share/grabtext/grabtext.log`
+    - Certifique-se de ter permissões de escrita no diretório de log
+    - Tente usar `grabtext logs --errors` para ver mensagens de erro
+
+Para mais ajuda, execute `grabtext help` ou verifique a ajuda específica do comando com `grabtext <comando> --help`. Ao reportar problemas, você pode usar `grabtext --debug` para obter uma saída mais detalhada que ajudará a diagnosticar o problema.
 
 ## Instalação Manual e Pré-requisitos
 

@@ -195,6 +195,12 @@ HELP_MESSAGES = {
 Usage:
   grabtext <command> [options]
 
+Global Options:
+  --debug                 Enable debug mode with verbose output
+  --verbose               Show detailed progress information
+  --config                Show current configuration
+  --version               Display version information
+
 Commands:
   grab     Capture and extract text
     --gui                 Use GUI mode (default)
@@ -235,6 +241,12 @@ Made by Gabriel Couto Ribeiro (rouri404) - 2025
 
 Uso:
   grabtext <comando> [opções]
+
+Opções Globais:
+  --debug                 Ativar modo de depuração com saída detalhada
+  --verbose               Mostrar informações detalhadas de progresso
+  --config                Mostrar configuração atual
+  --version               Exibir informações de versão
 
 Comandos:
   grab     Capturar e extrair texto
@@ -282,8 +294,9 @@ Uso:
   grabtext grab [opções]
 
 Opções:
-  --gui                  Usar modo GUI (padrão sem opções)
+  --gui                 Usar modo GUI (padrão sem opções)
   -l, --lang            Idioma para OCR (pt/en)
+  --dry-run             Mostrar o que seria feito sem executar
   -i, --image           Processar imagem/diretório existente
   -o, --output          Salvar saída em arquivo
   -f, --format          Formato de saída (text/json/csv)
@@ -309,8 +322,9 @@ Usage:
   grabtext grab [options]
 
 Options:
-  --gui                  Use GUI mode (default without options)
+  --gui                 Use GUI mode (default without options)
   -l, --lang            OCR language (pt/en)
+  --dry-run             Show what would be done without executing
   -i, --image           Process existing image/directory
   -o, --output          Save output to file
   -f, --format          Output format (text/json/csv)

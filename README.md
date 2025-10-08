@@ -45,6 +45,11 @@ It utilizes **Tesseract** for character recognition and **Flameshot** for intuit
 ## CLI Usage
 
 ```bash
+# Getting Help
+grabtext help                     # Show general help
+grabtext grab --help              # Show help for grab command
+grabtext logs --help              # Show help for logs command
+
 # Basic Usage
 grabtext grab                     # Capture screen area and extract text
 grabtext grab -l en               # Use English OCR
@@ -62,6 +67,13 @@ grabtext logs --since 2023-10-01  # Show logs since October 1st
 grabtext logs --errors            # Show only errors
 grabtext logs --export logs.txt   # Export logs to file
 grabtext logs --clear             # Clear log file
+
+# Debugging Options
+grabtext --debug                  # Enable debug mode with verbose output
+grabtext --verbose                # Show detailed progress information
+grabtext grab --dry-run           # Show what would be done without executing
+grabtext --version                # Display version information
+grabtext --config                 # Show current configuration
 ```
 
 ---
@@ -96,6 +108,40 @@ This project was developed and tested to work on major Linux desktop environment
     The script will ask for your password to install system packages (if not already installed) and configure the rest of the environment.
 
 ---
+
+## Environment Variables
+
+The following environment variables can be used to configure GrabText:
+
+*   `GRABTEXT_LANG`: Set the default OCR language (`en` or `pt`)
+*   `GRABTEXT_LOG`: Set custom log file location (default: `~/.local/share/grabtext/grabtext.log`)
+*   `GRABTEXT_NO_NOTIFY`: Disable desktop notifications when set to `1`
+
+## Troubleshooting
+
+Common issues and solutions:
+
+1.  **OCR not working properly:**
+    - Ensure the image has good contrast and is not blurry
+    - Try changing the OCR language with `-l` flag
+    - Check if tesseract is installed correctly
+
+2.  **Command not found:**
+    - Make sure `~/.local/bin` is in your PATH
+    - Try running `source ~/.bashrc` or restart your terminal
+    - Re-run the installation script
+
+3.  **GUI capture not working:**
+    - Check if Flameshot is installed and running
+    - Ensure you're in a graphical environment
+    - Try restarting the Flameshot service
+
+4.  **Logs not appearing:**
+    - Check the log file at `~/.local/share/grabtext/grabtext.log`
+    - Ensure you have write permissions in the log directory
+    - Try using `grabtext logs --errors` to see error messages
+
+For more help, run `grabtext help` or check the specific command help with `grabtext <command> --help`. When reporting issues, you can use `grabtext --debug` to get more detailed output that will help diagnose the problem.
 
 ## Manual Installation and Prerequisites
 
