@@ -401,6 +401,14 @@ def print_help():
 
 def process_single_image(image_path, args):
     """Processa uma única imagem e retorna o texto extraído"""
+    if args.dry_run:
+        print(f"Would process image: {image_path}")
+        print(f"  Language: {tesseract_lang_code}")
+        print(f"  Output format: {args.format}")
+        if args.output:
+            print(f"  Output file: {args.output}")
+        return None
+        
     send_notification(
         get_message('processing_image_title'),
         get_message('processing_image_content'),
@@ -516,16 +524,30 @@ def handle_grab_command(args):
                 icon_name="dialog-information"
             )
 
+VERSION = "1.3.0"
+
 def main():
+    
     parser = argparse.ArgumentParser(
         description='GrabText - Text extraction tool',
         add_help=False,
-        usage='grabtext <command> [options]\n\nCommands:\n  grab     Capture and extract text\n  logs     Manage log files\n  help     Show help message'
+        usage='grabtext <command> [options]\n\nCommands:\n  grab     Capture and extract text\n  logs     Manage log files\n  help     Show help message\n  version  Show version information'
     )
-    subparsers = parser.add_subparsers(dest='command', help='Commands', required=True)
+    
+    # Argumentos globais
+    parser.add_argument('--version', action='version', version=f'GrabText {VERSION}')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode with verbose output')
+    parser.add_argument('--verbose', action='store_true', help='Show detailed progress information')
+    parser.add_argument('--config', action='store_true', help='Show current configuration')
+    
+    subparsers = parser.add_subparsers(dest='command', help='Commands', required=False)  # Mudado para False para permitir --version
 
     # Help command
     help_parser = subparsers.add_parser('help', help='Show this help message')
+    
+    # Version command
+    version_parser = subparsers.add_parser('version', help='Show version information')
+    version_parser.set_defaults(func=lambda _: print(f'GrabText {VERSION}'))
 
     # Grab command
     grab_parser = subparsers.add_parser(
@@ -533,6 +555,7 @@ def main():
         help='Capture and extract text',
         usage='grabtext grab [options]\n\nExamples:\n  grabtext grab              # Capture from screen\n  grabtext grab -i image.png  # Process image file'
     )
+    grab_parser.add_argument('--gui', action='store_true', help='Use GUI mode (default without options)')
     grab_parser.add_argument('--lang', '-l', choices=['pt', 'en'], help='Language for OCR')
     grab_parser.add_argument('--silent', '-s', action='store_true', help='No notifications')
     grab_parser.add_argument('--output', '-o', help='Save to file')
@@ -542,6 +565,7 @@ def main():
     grab_parser.add_argument('--format', '-f', choices=['text', 'json', 'csv'], default='text', help='Output format')
     grab_parser.add_argument('--batch', action='store_true', help='Process multiple images')
     grab_parser.add_argument('--watch', action='store_true', help='Monitor directory for new images')
+    grab_parser.add_argument('--dry-run', action='store_true', help='Show what would be done without executing')
 
     # Logs command
     logs_parser = subparsers.add_parser('logs', help='Manage log files')
@@ -556,6 +580,35 @@ def main():
 
     try:
         args = parser.parse_args()
+        
+        # Salvar nível de log atual
+        original_log_level = logging.getLogger().level
+        
+        # Configurar logging baseado nas opções globais
+        if args.debug:
+            logging.getLogger().setLevel(logging.DEBUG)
+            logging.debug("Debug mode enabled")
+        elif args.verbose:
+            logging.getLogger().setLevel(logging.INFO)
+            logging.info("Verbose mode enabled")
+            
+        # Registrar início da sessão
+        logging.info(LOG_MESSAGES['SESSION_START'])
+            
+        # Mostrar configuração se solicitado
+        if args.config:
+            print(f"Configuration:")
+            print(f"  Version: {VERSION}")
+            print(f"  Language: {current_lang_code}")
+            print(f"  Log file: {LOG_FILE}")
+            print(f"  Debug mode: {'enabled' if args.debug else 'disabled'}")
+            print(f"  Verbose mode: {'enabled' if args.verbose else 'disabled'}")
+            return
+        
+        # Se nenhum comando foi fornecido, mostra a ajuda
+        if not args.command:
+            print_help()
+            return
     except argparse.ArgumentError as e:
         if current_lang_code == 'pt':
             print(f"Erro: Comando inválido. Use 'grabtext help' para ver os comandos disponíveis.")
@@ -569,8 +622,12 @@ def main():
             print(f"  grabtext grab -i image.png  # Process image file")
         return
 
-    if not args.command or args.command == 'help':
+    if args.command == 'help':
         print_help()
+        return
+        
+    if args.command == 'version':
+        print(f'GrabText {VERSION}')
         return
 
     if args.command == 'logs':
@@ -586,10 +643,12 @@ def main():
         if len(sys.argv) == 2:
             print_grab_help()
             return
-        handle_grab_command(args)
+        try:
+            handle_grab_command(args)
+        finally:
+            # Restaurar nível de log original
+            logging.getLogger().setLevel(original_log_level)
         return
-
-    logging.info(LOG_MESSAGES['SESSION_START'])
     try:
         if args.command == 'grab' and args.image:
             if os.path.isdir(args.image):
