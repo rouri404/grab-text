@@ -8,7 +8,7 @@
     <a href="README.md"><img src="https://img.shields.io/badge/Language-English%20%F0%9F%87%AC%F0%9F%87%A7-blue" alt="English"></a>
   </p>
     <p>
-    Capture e copie texto de qualquer imagem ou vídeo na sua tela. Uma ferramenta de OCR simples e poderosa para sistemas baseadas em Linux.
+    Capture e copie texto de qualquer imagem ou vídeo na sua tela. Uma ferramenta de OCR simples e poderosa para sistemas baseadas em Linux. Com interface gráfica e linha de comando.
   </p>
 </div>
 
@@ -28,11 +28,41 @@ Utiliza o **Tesseract** para o reconhecimento de caracteres e o **Flameshot** pa
 
 ## Funcionalidades
 
+### Funcionalidades Principais
 *   **OCR Multilíngue:** Suporte robusto para reconhecimento de texto em inglês (`en`) e português (`pt`).
 *   **Captura de Tela Intuitiva:** Utilize a interface do Flameshot para selecionar facilmente a área desejada da tela.
 *   **Cópia Instantânea:** O texto reconhecido é automaticamente copiado para a área de transferência.
 *   **Configuração Flexível:** Alterne o idioma do OCR usando uma variável de ambiente, conforme sua necessidade.
 *   **Registro de Atividades:** Geração de logs detalhados para facilitar a depuração.
+
+### Funcionalidades da Linha de Comando
+*   **Processamento de Imagens:** Processe imagens individuais ou diretórios inteiros
+*   **Processamento em Lote:** Manipule múltiplas imagens de uma vez
+*   **Monitoramento de Diretórios:** Observe pastas por novas imagens para processar
+*   **Múltiplos Formatos de Saída:** Suporte para saídas em texto, JSON e CSV
+*   **Gerenciamento Avançado de Logs:** Filtre, exporte e analise arquivos de log
+
+## Uso da Linha de Comando
+
+```bash
+# Uso Básico
+grabtext grab                      # Capturar área da tela e extrair texto
+grabtext grab -l en                # Usar OCR em inglês
+grabtext grab -i imagem.png        # Processar imagem existente
+grabtext grab -o saida.txt         # Salvar saída em arquivo
+
+# Processamento Avançado de Imagens
+grabtext grab -i ./imagens -r      # Processar diretório recursivamente
+grabtext grab -i ./imagens -f json # Saída em formato JSON
+grabtext grab --watch ./imagens    # Monitorar diretório por novas imagens
+
+# Gerenciamento de Logs
+grabtext logs --tail 10            # Mostrar últimas 10 entradas do log
+grabtext logs --since 2023-10-01   # Mostrar logs desde 1º de outubro
+grabtext logs --errors             # Mostrar apenas erros
+grabtext logs --export logs.txt    # Exportar logs para arquivo
+grabtext logs --clear              # Limpar arquivo de log
+```
 
 ---
 

@@ -8,7 +8,7 @@
     <a href="README.pt.md"><img src="https://img.shields.io/badge/Language-Português%20%F0%9F%87%A7%F0%9F%87%B7-blue" alt="Português"></a>
   </p>
     <p>
-    Capture and copy text from any image or video on your screen. A simple yet powerful OCR tool for Linux-based systems.
+    Capture and copy text from any image or video on your screen. A simple yet powerful OCR tool for Linux-based systems. Features both GUI and CLI interfaces.
   </p>
 </div>
 
@@ -28,11 +28,41 @@ It utilizes **Tesseract** for character recognition and **Flameshot** for intuit
 
 ## Features
 
+### Core Features
 *   **Multilingual OCR:** Robust support for text recognition in English (`en`) and Portuguese (`pt`).
 *   **Intuitive Screen Capture:** Use the Flameshot interface to easily select the desired screen area.
 *   **Instant Copy:** Recognized text is automatically copied to the clipboard.
 *   **Flexible Configuration:** Switch the OCR language using an environment variable, as needed.
 *   **Activity Logging:** Detailed logs are generated to facilitate debugging.
+
+### CLI Features
+*   **Image Processing:** Process single images or entire directories
+*   **Batch Processing:** Handle multiple images at once
+*   **Directory Monitoring:** Watch folders for new images to process
+*   **Multiple Output Formats:** Support for text, JSON, and CSV outputs
+*   **Advanced Log Management:** Filter, export, and analyze log files
+
+## CLI Usage
+
+```bash
+# Basic Usage
+grabtext grab                     # Capture screen area and extract text
+grabtext grab -l en               # Use English OCR
+grabtext grab -i image.png        # Process existing image
+grabtext grab -o output.txt       # Save output to file
+
+# Advanced Image Processing
+grabtext grab -i ./images -r      # Process directory recursively
+grabtext grab -i ./images -f json # Output in JSON format
+grabtext grab --watch ./images    # Monitor directory for new images
+
+# Log Management
+grabtext logs --tail 10           # Show last 10 log entries
+grabtext logs --since 2023-10-01  # Show logs since October 1st
+grabtext logs --errors            # Show only errors
+grabtext logs --export logs.txt   # Export logs to file
+grabtext logs --clear             # Clear log file
+```
 
 ---
 

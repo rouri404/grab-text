@@ -55,20 +55,98 @@ cp "./flameshot.ini" "$CONFIG_DIR/" || error "$MSG_COPY_CONFIG_FAIL"
 success "$MSG_FLAMESHOT_CONFIG_APPLIED"
 
 info "$MSG_CREATE_LAUNCH_SCRIPT"
-cat > launch.sh << EOL
+# Get absolute path of installation directory
+INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Create launch script
+cat > launch.sh << EOLSCRIPT
 #!/bin/bash
-SCRIPT_DIR=\$( cd -- "\$( dirname -- "\${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-PYTHON_EXEC="\$SCRIPT_DIR/.venv/bin/python"
-GRABTEXT_SCRIPT="\$SCRIPT_DIR/grabtext.py"
-export PATH=/usr/bin:/bin:/usr/local/bin:\$HOME/.local/bin
-export GRABTEXT_LANG="${DETECTED_LANG:-pt}"
-if [ ! -f "\$PYTHON_EXEC" ] || [ ! -f "\$GRABTEXT_SCRIPT" ]; then
-    notify-send "GrabText Error" "$MSG_LAUNCH_ERROR_FILES_NOT_FOUND"
+INSTALL_DIR="${INSTALL_DIR}"
+PYTHON_EXEC="\${INSTALL_DIR}/.venv/bin/python"
+GRABTEXT_SCRIPT="\${INSTALL_DIR}/grabtext.py"
+
+# Set language
+DETECTED_LANG=$(echo $LANG | cut -d'.' -f1 | cut -d'_' -f1 | tr '[:upper:]' '[:lower:]')
+export GRABTEXT_LANG="${GRABTEXT_LANG:-${DETECTED_LANG:-pt}}"
+
+# Set path
+export PATH=/usr/bin:/bin:/usr/local/bin:$HOME/.local/bin
+
+# Debug information (if needed)
+if [ "\$1" = "--debug" ]; then
+    echo "Install directory: \$INSTALL_DIR"
+    echo "Python executable: \$PYTHON_EXEC"
+    echo "Script path: \$GRABTEXT_SCRIPT"
+    echo "Current directory: \$(pwd)"
+    exit 0
+fi
+
+# Check installation directory
+if [ ! -d "\$INSTALL_DIR" ]; then
+    notify-send "GrabText Error" "Installation directory not found: \$INSTALL_DIR"
     exit 1
 fi
-flameshot gui --raw | "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT"
+
+# Check required files
+if [ ! -f "\$PYTHON_EXEC" ]; then
+    notify-send "GrabText Error" "Python environment not found. Try reinstalling GrabText."
+    echo "Missing: \$PYTHON_EXEC" >&2
+    exit 1
+fi
+
+if [ ! -f "\$GRABTEXT_SCRIPT" ]; then
+    notify-send "GrabText Error" "Script not found. Try reinstalling GrabText."
+    echo "Missing: \$GRABTEXT_SCRIPT" >&2
+    exit 1
+fi
+
+# Execute command
+if [ "\$1" = "--gui" ] || [ "\$1" = "grab" -a "\$2" = "--gui" ]; then
+    # GUI Mode
+    if ! command -v flameshot &> /dev/null; then
+        notify-send "GrabText Error" "Flameshot not found. Please install it first."
+        exit 1
+    fi
+    flameshot gui --raw | "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT" grab
+elif [ -z "\$1" ]; then
+    # No arguments - show help
+    "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT" help
+else
+    # CLI Mode - pass all arguments
+    "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT" "\$@"
+fi
+EOLSCRIPT
+# Execute command
+if [ "$1" = "--gui" ] || [ "$1" = "grab" -a "$2" = "--gui" ]; then
+    # GUI Mode
+    if ! command -v flameshot &> /dev/null; then
+        notify-send "GrabText Error" "Flameshot not found. Please install it first."
+        exit 1
+    fi
+    flameshot gui --raw | "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" grab
+elif [ -z "$1" ]; then
+    # No arguments - show help
+    "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" help
+else
+    # CLI Mode - pass all arguments
+    "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" "$@"
+fi
+EOL
 EOL
 success "$MSG_LAUNCH_SCRIPT_CREATED"
+
+# Create CLI command
+info "$MSG_CREATING_CLI_COMMAND"
+mkdir -p "$HOME/.local/bin"
+GRABTEXT_CLI="$HOME/.local/bin/grabtext"
+ln -sf "$PWD/launch.sh" "$GRABTEXT_CLI"
+
+# Add ~/.local/bin to PATH if not already present
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    SHELL_RC="$HOME/.$(basename $SHELL)rc"
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_RC"
+    info "$MSG_PATH_UPDATED"
+fi
 
 chmod +x grabtext.py
 chmod +x launch.sh

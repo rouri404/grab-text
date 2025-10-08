@@ -28,6 +28,13 @@ warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 info "$MSG_UNINSTALL_START"
 read -p "$MSG_CONFIRM_UNINSTALL" response
 if [[ "$response" =~ ^([yY])$ ]]; then
+    # Remove CLI command
+    info "$MSG_REMOVING_CLI"
+    GRABTEXT_CLI="$HOME/.local/bin/grabtext"
+    if [ -L "$GRABTEXT_CLI" ]; then
+        rm -f "$GRABTEXT_CLI"
+        success "$MSG_CLI_REMOVED"
+    fi
 
     info "\n$MSG_REMOVE_SHORTCUT_ATTEMPT"
     if [ -n "$XDG_CURRENT_DESKTOP" ]; then DESKTOP_ENV="$XDG_CURRENT_DESKTOP"; elif [ -n "$GDMSESSION" ]; then DESKTOP_ENV="$GDMSESSION"; else DESKTOP_ENV="$DESKTOP_SESSION"; fi
