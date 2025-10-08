@@ -66,11 +66,37 @@ PYTHON_EXEC="\${INSTALL_DIR}/.venv/bin/python"
 GRABTEXT_SCRIPT="\${INSTALL_DIR}/grabtext.py"
 
 # Set language
-DETECTED_LANG=$(echo $LANG | cut -d'.' -f1 | cut -d'_' -f1 | tr '[:upper:]' '[:lower:]')
-export GRABTEXT_LANG="${GRABTEXT_LANG:-${DETECTED_LANG:-pt}}"
+DETECTED_LANG=\$(echo \$LANG | cut -d'.' -f1 | cut -d'_' -f1 | tr '[:upper:]' '[:lower:]')
+export GRABTEXT_LANG="${GRABTEXT_LANG:-\${DETECTED_LANG:-pt}}"
 
-# Set path
-export PATH=/usr/bin:/bin:/usr/local/bin:$HOME/.local/bin
+# Set path to include common locations for required tools
+export PATH=/usr/bin:/bin:/usr/local/bin:/usr/sbin:/sbin:\$HOME/.local/bin:\$PATH
+
+# Check for GUI environment and tools
+has_display() {
+    # First check if DISPLAY is set
+    [ -n "\$DISPLAY" ] || return 1
+    
+    # Then check if we can query X server
+    if command -v xdpyinfo >/dev/null 2>&1; then
+        xdpyinfo >/dev/null 2>&1
+        return \$?
+    elif command -v xhost >/dev/null 2>&1; then
+        xhost >/dev/null 2>&1
+        return \$?
+    fi
+    
+    # If no X tools available, check Wayland
+    [ -n "\$WAYLAND_DISPLAY" ]
+    return \$?
+}
+
+has_gui_tools() {
+    # Check if essential GUI tools are available
+    command -v flameshot >/dev/null 2>&1 || return 1
+    command -v notify-send >/dev/null 2>&1 || return 1
+    return 0
+}
 
 # Debug information (if needed)
 if [ "\$1" = "--debug" ]; then
@@ -78,6 +104,7 @@ if [ "\$1" = "--debug" ]; then
     echo "Python executable: \$PYTHON_EXEC"
     echo "Script path: \$GRABTEXT_SCRIPT"
     echo "Current directory: \$(pwd)"
+    echo "Display available: \$(has_display && echo 'yes' || echo 'no')"
     exit 0
 fi
 
@@ -101,13 +128,35 @@ if [ ! -f "\$GRABTEXT_SCRIPT" ]; then
 fi
 
 # Execute command
-if [ "\$1" = "--gui" ] || [ "\$1" = "grab" -a "\$2" = "--gui" ]; then
-    # GUI Mode
-    if ! command -v flameshot &> /dev/null; then
-        notify-send "GrabText Error" "Flameshot not found. Please install it first."
+if [ "\$1" = "grab" ] || [ "\$1" = "--gui" ]; then
+    # Check GUI requirements
+    if ! has_display; then
+        echo "Error: No display available. X11 or Wayland is required for GUI operations." >&2
         exit 1
     fi
-    flameshot gui --raw | "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT" grab
+
+    if ! has_gui_tools; then
+        echo "Error: Required GUI tools (flameshot, notify-send) are not installed." >&2
+        exit 1
+    fi
+
+    # GUI Mode - Use temporary file to handle the screenshot
+    TEMP_IMG=\$(mktemp -t grabtext-XXXXXX.png)
+    cleanup() {
+        rm -f "\$TEMP_IMG"
+    }
+    trap cleanup EXIT
+
+    # Capture screenshot to temp file
+    if flameshot gui --raw > "\$TEMP_IMG"; then
+        if [ -s "\$TEMP_IMG" ]; then  # Check if file is not empty
+            # Process the image with Python
+            "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT" grab -i "\$TEMP_IMG" --clipboard
+        else
+            echo "No image captured." >&2
+            exit 1
+        fi
+    fi
 elif [ -z "\$1" ]; then
     # No arguments - show help
     "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT" help
@@ -116,23 +165,9 @@ else
     "\$PYTHON_EXEC" "\$GRABTEXT_SCRIPT" "\$@"
 fi
 EOLSCRIPT
-# Execute command
-if [ "$1" = "--gui" ] || [ "$1" = "grab" -a "$2" = "--gui" ]; then
-    # GUI Mode
-    if ! command -v flameshot &> /dev/null; then
-        notify-send "GrabText Error" "Flameshot not found. Please install it first."
-        exit 1
-    fi
-    flameshot gui --raw | "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" grab
-elif [ -z "$1" ]; then
-    # No arguments - show help
-    "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" help
-else
-    # CLI Mode - pass all arguments
-    "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" "$@"
-fi
-EOL
-EOL
+
+# Set permissions
+chmod +x launch.sh
 success "$MSG_LAUNCH_SCRIPT_CREATED"
 
 # Create CLI command
@@ -170,50 +205,65 @@ echo ""
 success "$MSG_INSTALL_COMPLETE"
 info "$MSG_AUTO_SHORTCUT_SETUP"
 
-EXEC_COMMAND_FOR_AUTOMATION="$PWD/launch.sh"
-EXEC_COMMAND_FOR_AUTOMATION_ESCAPED=$(escape_path_with_single_quotes "$EXEC_COMMAND_FOR_AUTOMATION")
-COMMAND_FOR_MANUAL_COPY="$EXEC_COMMAND_FOR_AUTOMATION_ESCAPED"
+# Install .desktop file
+info "$MSG_DESKTOP_FILE_SETUP"
+APPS_DIR="$HOME/.local/share/applications"
+mkdir -p "$APPS_DIR"
+cp "./grabtext.desktop" "$APPS_DIR/" || warning "$MSG_DESKTOP_FILE_COPY_FAIL"
 
-SESSION_INFO=$(echo ":$XDG_CURRENT_DESKTOP:$GDMSESSION:$DESKTOP_SESSION:" | tr '[:upper:]' '[:lower:]')
-info "$MSG_DETECTED_DESKTOP ${XDG_CURRENT_DESKTOP:-$MSG_NOT_DETECTED}"
+# Detect desktop environment
+SESSION_TYPE="unknown"
+if [ -n "$XDG_CURRENT_DESKTOP" ]; then
+    SESSION_TYPE=$(echo "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')
+elif [ -n "$DESKTOP_SESSION" ]; then
+    SESSION_TYPE=$(echo "$DESKTOP_SESSION" | tr '[:upper:]' '[:lower:]')
+fi
 
-case "$SESSION_INFO" in
-  *:gnome*|*:cinnamon*)
-    info "$MSG_ATTEMPT_GNOME_SHORTCUT"
-    KEY_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/"
-
-    gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['$KEY_PATH']" &> /dev/null
-    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$KEY_PATH name 'GrabText' &> /dev/null
-    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$KEY_PATH command "$EXEC_COMMAND_FOR_AUTOMATION_ESCAPED" &> /dev/null
-
-    SET_BINDING_OUTPUT=$(gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$KEY_PATH binding 'Insert' 2>&1)
-    EXIT_CODE=$?
-
-    if [ $EXIT_CODE -eq 0 ]; then
-        sleep 1
-        success "$MSG_SHORTCUT_SUCCESS"
-    else
-        warning "$MSG_AUTO_SHORTCUT_FAIL_GENERIC"
-        echo -e "${RED}$SET_BINDING_OUTPUT${NC}"
-        info "\n$MSG_MANUAL_SHORTCUT_PROMPT"
-        echo -e "${YELLOW}${COMMAND_FOR_MANUAL_COPY}${NC}"
-    fi
-
-    ;;
-  *:xfce*)
-    info "$MSG_ATTEMPT_XFCE_SHORTCUT"
-    if xfconf-query -c xfce4-keyboard-shortcuts -p /commands/custom/Insert -n -t string -s "$EXEC_COMMAND_FOR_AUTOMATION" ; then
-        success "$MSG_SHORTCUT_SUCCESS"
-    else
-        warning "$MSG_AUTO_SHORTCUT_FAIL_GENERIC"
-        info "$MSG_MANUAL_SHORTCUT_PROMPT"
-        echo -e "${YELLOW}${COMMAND_FOR_MANUAL_COPY}${NC}"
-    fi
-    ;;
-  *)
-    warning "$MSG_AUTOMATION_NOT_SUPPORTED"
-    info "$MSG_MANUAL_SHORTCUT_PROMPT"
-    echo -e "${YELLOW}${COMMAND_FOR_MANUAL_COPY}${NC}"
-    ;;
+# Configure shortcut based on desktop environment
+case "$SESSION_TYPE" in
+    *gnome*|*ubuntu*|*cinnamon*)
+        info "$MSG_ATTEMPT_GNOME_SHORTCUT"
+        if command -v gsettings > /dev/null; then
+            KEY_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/grabtext/"
+            dconf reset -f /org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/grabtext/ &> /dev/null || true
+            gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['$KEY_PATH']" &> /dev/null && \
+            gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$KEY_PATH name 'GrabText' &> /dev/null && \
+            gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$KEY_PATH command "$PWD/launch.sh grab" &> /dev/null && \
+            gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$KEY_PATH binding 'Insert' &> /dev/null && \
+            success "$MSG_SHORTCUT_SUCCESS" || warning "$MSG_SHORTCUT_FAIL"
+        else
+            warning "$MSG_NO_GSETTINGS"
+        fi
+        ;;
+    *xfce*)
+        info "$MSG_ATTEMPT_XFCE_SHORTCUT"
+        if command -v xfconf-query > /dev/null; then
+            xfconf-query -c xfce4-keyboard-shortcuts -p /commands/custom/Insert -r &> /dev/null || true
+            if xfconf-query -c xfce4-keyboard-shortcuts -p /commands/custom/Insert -n -t string -s "$PWD/launch.sh grab"; then
+                success "$MSG_SHORTCUT_SUCCESS"
+            else
+                warning "$MSG_SHORTCUT_FAIL"
+            fi
+        else
+            warning "$MSG_NO_XFCONF"
+        fi
+        ;;
+    *kde*|*plasma*)
+        info "$MSG_ATTEMPT_KDE_SHORTCUT"
+        if command -v kwriteconfig5 > /dev/null; then
+            # Remove atalho existente se houver
+            kwriteconfig5 --file kglobalshortcutsrc --group "GrabText" --delete &> /dev/null || true
+            # Adicionar novo atalho
+            kwriteconfig5 --file kglobalshortcutsrc --group "GrabText" --key "Grab Text" "$PWD/launch.sh grab,none,Grab Text" && \
+            kwriteconfig5 --file kglobalshortcutsrc --group "GrabText" --key "_k_friendly_name" "GrabText" && \
+            kwriteconfig5 --file kglobalshortcutsrc --group "GrabText" --key "_launch" "Insert,none,GrabText" && \
+            success "$MSG_SHORTCUT_SUCCESS" || warning "$MSG_SHORTCUT_FAIL"
+        else
+            warning "$MSG_NO_KWRITECONFIG"
+        fi
+        ;;
+    *)
+        warning "$MSG_DESKTOP_NOT_DETECTED"
+        ;;
 esac
 echo ""

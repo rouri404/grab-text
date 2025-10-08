@@ -1,13 +1,44 @@
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+.Python
 .venv/
 venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Editor/IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*.tmp
-launch.sh
+.vim/
+*.sublime-workspace
+*.sublime-project
+
+# Logs e arquivos temporários
+*.log
 grabtext.log
+*.tmp
+*.temp
+*.bak
+
+# Arquivos gerados durante a instalação/execução
+launch.sh
+grabtext.desktop
+flameshot.ini.bak
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.directory
+.Trash-*
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# Arquivos específicos do projeto
+temp_screenshot_*.png
+grabtext-*.png

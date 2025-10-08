@@ -28,13 +28,42 @@ logging.basicConfig(
 LOG_MESSAGES = {
     'SESSION_START': "Session started.",
     'NO_IMAGE_DATA': "No image data received from stdin.",
-    'OCR_SUCCESS': "OCR success: lang={lang}, chars={chars}, preview=\"{preview}\"",
+    'OCR_SUCCESS': "OCR success: lang={lang}, chars={chars}, text=\"{text}\"",
     'OCR_NO_TEXT': "OCR complete: No text detected.",
     'CLIPBOARD_ERROR': "Clipboard tool not found (xclip/wl-copy).",
     'NOTIFY_SEND_MISSING': "notify-send command not found.",
     'NOTIFY_SEND_ERROR': "notify-send command failed: {e}",
     'UNEXPECTED_ERROR': "Unexpected error: {e}",
 }
+
+def notify_user(text, title="GrabText", icon_name="document-save-as"):
+    try:
+        subprocess.run(["notify-send", title, text, "--icon=" + icon_name])
+    except FileNotFoundError:
+        logging.warning(LOG_MESSAGES['NOTIFY_SEND_MISSING'])
+    except subprocess.CalledProcessError as e:
+        logging.error(LOG_MESSAGES['NOTIFY_SEND_ERROR'].format(e=e))
+
+def copy_to_clipboard(text):
+    if not text:
+        return False
+
+    # Try xclip first (X11)
+    try:
+        p = subprocess.Popen(['xclip', '-selection', 'clipboard'], stdin=subprocess.PIPE)
+        p.communicate(input=text.encode())
+        return True
+    except FileNotFoundError:
+        pass
+
+    # Try wl-copy (Wayland)
+    try:
+        p = subprocess.Popen(['wl-copy'], stdin=subprocess.PIPE)
+        p.communicate(input=text.encode())
+        return True
+    except FileNotFoundError:
+        logging.error(LOG_MESSAGES['CLIPBOARD_ERROR'])
+        return False
 
 current_lang_code = os.environ.get('GRABTEXT_LANG', 'pt').lower()
 tesseract_lang_code = 'por' if current_lang_code == 'pt' else 'eng'
@@ -93,19 +122,30 @@ def send_notification(title, message, icon_name="", expire_timeout=5000):
         logging.error(LOG_MESSAGES['NOTIFY_SEND_ERROR'].format(e=e))
 
 def copy_to_clipboard(text):
+    if not text:
+        return False
+
     try:
-        subprocess.run(['xclip', '-selection', 'clipboard'], input=text.encode('utf-8'), check=True)
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        try:
+        # Primeiro tenta xclip (X11)
+        if subprocess.run(['which', 'xclip'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+            subprocess.run(['xclip', '-selection', 'clipboard'], input=text.encode('utf-8'), check=True)
+            return True
+        
+        # Se não tiver xclip, tenta wl-copy (Wayland)
+        if subprocess.run(['which', 'wl-copy'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
             subprocess.run(['wl-copy'], input=text.encode('utf-8'), check=True)
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            logging.error(LOG_MESSAGES['CLIPBOARD_ERROR'])
-            send_notification(
-                get_message('grabtext_error_title'),
-                get_message('error_clipboard_install'),
-                icon_name="dialog-error",
-                expire_timeout=7000
-            )
+            return True
+        
+        # Se chegou aqui, nenhuma ferramenta está disponível
+        raise FileNotFoundError("No clipboard tool (xclip or wl-copy) found")
+    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+        logging.error(f"{LOG_MESSAGES['CLIPBOARD_ERROR']} Details: {str(e)}")
+        send_notification(
+            get_message('grabtext_error_title'),
+            get_message('error_clipboard_install'),
+            icon_name="error"
+        )
+        return False
 
 class ImageHandler(FileSystemEventHandler):
     def __init__(self, process_func):
@@ -287,7 +327,7 @@ def print_grab_help():
         help_text = """
 ╭─────────────────────────────────────────────────╮
 │               GrabText: grab                    │
-│      Captura e extração de texto               │
+│      Captura e extração de texto                │
 ╰─────────────────────────────────────────────────╯
 
 Uso:
@@ -346,7 +386,7 @@ def print_logs_help():
         help_text = """
 ╭─────────────────────────────────────────────────╮
 │               GrabText: logs                    │
-│      Gerenciamento de arquivos de log          │
+│      Gerenciamento de arquivos de log           │
 ╰─────────────────────────────────────────────────╯
 
 Uso:
@@ -401,30 +441,115 @@ def print_help():
 
 def process_single_image(image_path, args):
     """Processa uma única imagem e retorna o texto extraído"""
-    if args.dry_run:
-        print(f"Would process image: {image_path}")
-        print(f"  Language: {tesseract_lang_code}")
-        print(f"  Output format: {args.format}")
-        if args.output:
-            print(f"  Output file: {args.output}")
-        return None
+    try:
+        if not os.path.isfile(image_path):
+            logging.error(f"Image file not found: {image_path}")
+            send_notification(
+                get_message('grabtext_error_title'),
+                f"Image file not found: {image_path}",
+                icon_name="error"
+            )
+            return None
+
+        if args.dry_run:
+            print(f"Would process image: {image_path}")
+            print(f"  Language: {tesseract_lang_code}")
+            print(f"  Output format: {args.format}")
+            if args.output:
+                print(f"  Output file: {args.output}")
+            return None
+            
+        send_notification(
+            get_message('processing_image_title'),
+            get_message('processing_image_content'),
+            icon_name="image"
+        )
         
-    send_notification(
-        get_message('processing_image_title'),
-        get_message('processing_image_content'),
-        icon_name="image"
-    )
-    
-    img = Image.open(image_path)
-    text = pytesseract.image_to_string(img, lang=tesseract_lang_code)
-    return text.strip() if text else None
+        img = Image.open(image_path)
+        text = pytesseract.image_to_string(img, lang=tesseract_lang_code)
+        extracted_text = text.strip()
+
+        if not extracted_text:
+            send_notification(
+                get_message('no_text_detected_title'),
+                get_message('no_text_detected_content'),
+                icon_name="dialog-warning"
+            )
+            return None
+
+        logging.info(LOG_MESSAGES['OCR_SUCCESS'].format(
+            lang=tesseract_lang_code,
+            chars=len(extracted_text),
+            text=extracted_text.replace('\n', '\\n')
+        ))
+
+        return extracted_text
+
+    except Exception as e:
+        error_msg = f"Error processing image: {str(e)}"
+        logging.error(error_msg)
+        send_notification(
+            get_message('unexpected_error_title'),
+            get_message('unexpected_error_content', preview=str(e)),
+            icon_name="error"
+        )
+        return None
 
 def handle_grab_command(args):
     """Manipula o comando grab com diferentes opções"""
     result = None
-    
-    # Se não houver argumentos ou --gui, usa o Flameshot
-    if not args.image:
+
+    # Se foi fornecido um arquivo ou diretório com -i
+    if args.image:
+        # Se é um diretório
+        if os.path.isdir(args.image):
+            if args.watch:
+                # Modo de monitoramento
+                event_handler = ImageHandler(lambda x: process_single_image(x, args))
+                observer = Observer()
+                observer.schedule(event_handler, args.image, recursive=args.recursive)
+                observer.start()
+
+                send_notification(
+                    get_message('watching_directory_title'),
+                    get_message('watching_directory_content', path=args.image),
+                    icon_name="folder-open"
+                )
+
+                try:
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    observer.stop()
+                observer.join()
+                return
+            
+            # Processamento em lote
+            pattern = '**/*' if args.recursive else '*'
+            count = 0
+            results = []
+            
+            for img_path in Path(args.image).glob(pattern):
+                if img_path.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+                    text = process_single_image(str(img_path), args)
+                    if text:
+                        count += 1
+                        results.append({"file": str(img_path), "text": text})
+            
+            if results:
+                result = json.dumps(results, indent=2) if args.format == 'json' else \
+                        '\n'.join(r['text'] for r in results)
+                
+                send_notification(
+                    get_message('batch_complete_title'),
+                    get_message('batch_complete_content', count=count, path=args.image),
+                    icon_name="document-save-as"
+                )
+        else:
+            # Arquivo único
+            result = process_single_image(args.image, args)
+    else:
+        # Modo captura com Flameshot
         try:
             image_data = sys.stdin.buffer.read()
             if not image_data:
@@ -448,52 +573,6 @@ def handle_grab_command(args):
                 icon_name="dialog-error"
             )
             return
-    
-    # Se foi fornecido um diretório
-    elif os.path.isdir(args.image):
-        if args.watch:
-            send_notification(
-                get_message('watching_directory_title'),
-                get_message('watching_directory_content', path=args.image),
-                icon_name="folder-visiting"
-            )
-            event_handler = ImageHandler(lambda x: process_single_image(x, args))
-            observer = Observer()
-            observer.schedule(event_handler, args.image, recursive=args.recursive)
-            observer.start()
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                observer.stop()
-            observer.join()
-            return
-        
-        # Processamento em lote
-        pattern = '**/*' if args.recursive else '*'
-        count = 0
-        results = []
-        
-        for img_path in Path(args.image).glob(pattern):
-            if img_path.suffix.lower() in ['.png', '.jpg', '.jpeg']:
-                text = process_single_image(str(img_path), args)
-                if text:
-                    count += 1
-                    results.append({"file": str(img_path), "text": text})
-        
-        if results:
-            result = json.dumps(results, indent=2) if args.format == 'json' else \
-                    '\n'.join(r['text'] for r in results)
-            
-            send_notification(
-                get_message('batch_complete_title'),
-                get_message('batch_complete_content', count=count, path=args.image),
-                icon_name="document-save-as"
-            )
-    
-    # Se foi fornecido um arquivo
-    else:
-        result = process_single_image(args.image, args)
     
     if result:
         # Salvar em arquivo se especificado
@@ -703,7 +782,7 @@ def main():
             logging.info(LOG_MESSAGES['OCR_SUCCESS'].format(
                 lang=tesseract_lang_code,
                 chars=len(clean_text),
-                preview=preview
+                text=clean_text.replace('\n', '\\n')
             ))
             
             send_notification(

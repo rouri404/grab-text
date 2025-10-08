@@ -69,11 +69,24 @@ if [[ "$response" =~ ^([yY])$ ]]; then
         ;;
     esac
 
+    # Restore or remove Flameshot configuration
     CONFIG_DIR="$HOME/.config/flameshot"
-    if [ -f "$CONFIG_DIR/flameshot.ini.bak" ]; then mv "$CONFIG_DIR/flameshot.ini.bak" "$CONFIG_DIR/flameshot.ini"; success "$MSG_FLAMESHOT_RESTORED"; else rm -f "$CONFIG_DIR/flameshot.ini"; fi
+    if [ -f "$CONFIG_DIR/flameshot.ini.bak" ]; then 
+        mv "$CONFIG_DIR/flameshot.ini.bak" "$CONFIG_DIR/flameshot.ini" 
+        success "$MSG_FLAMESHOT_RESTORED"
+    elif [ -f "$CONFIG_DIR/flameshot.ini" ]; then
+        rm -f "$CONFIG_DIR/flameshot.ini"
+        success "Flameshot configuration removed"
+    fi
+
+    # Remove Python virtual environment and generated files
     rm -rf .venv
     rm -f launch.sh
     rm -f grabtext.log
+    
+    # Remove any cached Python files
+    find . -type f -name "*.pyc" -delete
+    find . -type d -name "__pycache__" -exec rm -rf {} +
     success "$MSG_VENV_LAUNCH_LOG_REMOVED"
 
     warning "\n$MSG_REMINDER_PKG_REMOVAL"
