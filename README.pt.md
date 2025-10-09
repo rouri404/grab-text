@@ -212,16 +212,16 @@ Problemas comuns e soluções:
   
   Se a automação falhou ou foi pulada, você pode configurar o atalho manualmente em poucos passos. O comando que você precisará usar é o caminho absoluto para o script `launch.sh`, que o instalador criou para você.
   
-  **Exemplo do Comando:** `/home/seu-usuario/'Área de trabalho'/GrabText/launch.sh`
-
+  **Exemplo do Comando:** `/home/gabriel/GrabText/launch.sh grab`
+  
   Siga o guia correspondente ao seu ambiente de trabalho:
-
+  
   #### Para GNOME (Ubuntu, Fedora)
   1.  Abra **Configurações** > **Teclado** > **Atalhos de Teclado**.
   2.  Role até **Atalhos Personalizados** e clique no `+`.
   3.  Preencha os campos:
       * **Nome:** `GrabText`
-      * **Comando:** Insira o caminho completo para o arquivo `launch.sh`.
+      * **Comando:** Insira o caminho completo para o arquivo `launch.sh`, seguido por `grab`. Por exemplo, `/home/gabriel/GrabText/launch.sh grab`.
       * **Atalho:** Pressione a tecla `INSERT`.
   4.  Clique em "Adicionar".
 
@@ -231,13 +231,13 @@ Problemas comuns e soluções:
   3.  Preencha os campos:
       * **Nome:** `GrabText`
       * Aba **Gatilho**: Pressione a tecla `INSERT`.
-      * Aba **Ação**: No campo "Comando/URL", insira o caminho completo para o `launch.sh`.
+      * Aba **Ação**: No campo "Comando/URL", insira o caminho completo para o `launch.sh`, seguido por `grab`. Por exemplo, `/home/gabriel/GrabText/launch.sh grab`.
   4.  Clique em "Aplicar".
 
   #### Para XFCE
   1.  Vá para **Configurações** > **Teclado** > **Atalhos de aplicativos**.
   2.  Clique em **"Adicionar"**.
-  3.  No campo "Comando", insira o caminho completo para o `launch.sh`.
+  3.  No campo "Comando", insira o caminho completo para o `launch.sh`, seguido por `grab`. Por exemplo, `/home/gabriel/GrabText/launch.sh grab`.
   4.  Quando o sistema pedir a tecla, pressione `INSERT`.
 </details>
 
