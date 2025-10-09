@@ -73,7 +73,8 @@ INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Create launch script
 cat > launch.sh << 'EOLSCRIPT'
 #!/bin/bash
-INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+INSTALL_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 PYTHON_EXEC="${INSTALL_DIR}/.venv/bin/python"
 GRABTEXT_SCRIPT="${INSTALL_DIR}/grabtext.py"
 

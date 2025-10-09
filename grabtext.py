@@ -1212,9 +1212,14 @@ def main():
             handle_config_command()
             return
         
-        # Se nenhum comando foi fornecido, executa captura da tela (comportamento padrão)
+        # Se nenhum comando foi fornecido
         if not args.command:
-            # Criar um namespace com argumentos padrão para captura da tela
+            # Em modo debug/verbose sem subcomando, exibir status em vez de abrir GUI
+            if args.debug or args.verbose or args.config:
+                handle_status_command()
+                return
+
+            # Caso contrário, comportamento padrão: captura da tela
             grab_args = argparse.Namespace(
                 path=None,
                 lang=None,
