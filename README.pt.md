@@ -268,6 +268,8 @@ Problemas comuns e soluções:
 
 Para mais ajuda, execute `grabtext help` ou verifique a ajuda específica do comando com `grabtext <comando> --help`. Ao reportar problemas, você pode usar `grabtext --debug` para obter uma saída mais detalhada que ajudará a diagnosticar o problema.
 
+---
+
 ### Instalação Manual e Pré-requisitos
 
 Caso o script `install.sh` encontre algum erro, você pode instalar as dependências manualmente com os seguintes comandos:
