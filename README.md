@@ -45,7 +45,7 @@ It utilizes **Tesseract** for character recognition and **Flameshot** for intuit
 *   **System Status:** Check dependencies and configuration
 *   **Batch Processing:** Handle multiple images efficiently
 
-## CLI Usage
+## CLI Commands
 
 The GrabText CLI is organized into main commands and utility commands for better usability:
 
@@ -101,6 +101,16 @@ grabtext --dry-run                # Show what would be done without executing
 
 ---
 
+## Environment Variables
+
+The following environment variables can be used to configure GrabText:
+
+*   `GRABTEXT_LANG`: Set the default OCR language (`en` or `pt`)
+*   `GRABTEXT_LOG`: Set custom log file location (default: `~/.local/share/grabtext/grabtext.log`)
+*   `GRABTEXT_NO_NOTIFY`: Disable desktop notifications when set to `1`
+
+---
+
 ## Compatibility
 
 This project was developed and tested to work on major Linux desktop environments. Shortcut automation is most effective in the following environments:
@@ -129,98 +139,6 @@ This project was developed and tested to work on major Linux desktop environment
     ./install.sh
     ```
     The script will ask for your password to install system packages (if not already installed) and configure the rest of the environment.
-
----
-
-## New Commands
-
-### System Status (`grabtext status`)
-Check system dependencies, Python environment, and configuration:
-```bash
-grabtext status                   # Show complete system status
-```
-
-### Configuration (`grabtext config`)
-Display current configuration and environment variables:
-```bash
-grabtext config                   # Show detailed configuration
-```
-
-### Process Command (`grabtext process`)
-Process existing images or directories with advanced options:
-```bash
-grabtext process image.png        # Process single image
-grabtext process ./images -r      # Process directory recursively
-grabtext process ./images -f json # Output in JSON format
-grabtext process ./images --batch # Process multiple images
-```
-
-### Monitor Command (`grabtext monitor`)
-Monitor directories for new images and process them automatically:
-```bash
-grabtext monitor ./images         # Monitor directory
-grabtext monitor ./images -r      # Monitor recursively
-grabtext monitor ./images -f csv  # Output in CSV format
-```
-
-## Environment Variables
-
-The following environment variables can be used to configure GrabText:
-
-*   `GRABTEXT_LANG`: Set the default OCR language (`en` or `pt`)
-*   `GRABTEXT_LOG`: Set custom log file location (default: `~/.local/share/grabtext/grabtext.log`)
-*   `GRABTEXT_NO_NOTIFY`: Disable desktop notifications when set to `1`
-
-## Troubleshooting
-
-Common issues and solutions:
-
-1.  **OCR not working properly:**
-    - Ensure the image has good contrast and is not blurry
-    - Try changing the OCR language with `-l` flag
-    - Check if tesseract is installed correctly
-
-2.  **Command not found:**
-    - Make sure `~/.local/bin` is in your PATH
-    - Try running `source ~/.bashrc` or restart your terminal
-    - Re-run the installation script
-
-3.  **GUI capture not working:**
-    - Check if Flameshot is installed and running
-    - Ensure you're in a graphical environment
-    - Try restarting the Flameshot service
-
-4.  **Logs not appearing:**
-    - Check the log file at `~/.local/share/grabtext/grabtext.log`
-    - Ensure you have write permissions in the log directory
-    - Try using `grabtext logs --errors` to see error messages
-
-For more help, run `grabtext help` or check the specific command help with `grabtext <command> --help`. When reporting issues, you can use `grabtext --debug` to get more detailed output that will help diagnose the problem.
-
-## Manual Installation and Prerequisites
-
-If the `install.sh` script encounters any errors, you can manually install the dependencies with the following commands:
-
-#### For Arch Linux and derivatives (Manjaro, EndeavourOS)
-```bash
-sudo pacman -S flameshot tesseract tesseract-data-por tesseract-data-eng xclip python-pip libnotify
-```
-
-#### For Debian, Ubuntu, and derivatives (Mint, Pop!_OS)
-```bash
-sudo apt install flameshot tesseract-ocr tesseract-ocr-por tesseract-ocr-eng xclip python3-pip libnotify-bin
-```
-
-#### For Fedora
-```bash
-sudo dnf install flameshot tesseract tesseract-langpack-por langpacks-eng xclip python3-pip libnotify
-```
-
-#### For openSUSE
-```bash
-sudo zypper install flameshot tesseract-ocr tesseract-ocr-data-por tesseract-ocr-eng xclip python3-pip libnotify-tools
-```
-After manual installation, continue with step 2 in the **Installation** section above.
 
 ---
 
@@ -253,7 +171,41 @@ You can force the OCR language (between English `en` and Portuguese `pt`) using 
 
 ---
 
-## Troubleshooting and FAQ
+## Troubleshooting
+
+Common issues and solutions:
+
+<details>
+  <summary><strong>OCR not working properly</strong></summary>
+  
+  *   Ensure the image has good contrast and is not blurry.
+  *   Try changing the OCR language with the `-l` flag.
+  *   Check if Tesseract is installed correctly.
+</details>
+
+<details>
+  <summary><strong>Command not found</strong></summary>
+  
+  *   Make sure `~/.local/bin` is in your PATH.
+  *   Try running `source ~/.bashrc` or restarting your terminal.
+  *   Re-run the installation script.
+</details>
+
+<details>
+  <summary><strong>GUI capture not working</strong></summary>
+  
+  *   Check if Flameshot is installed and running.
+  *   Ensure you're in a graphical environment.
+  *   Try restarting the Flameshot service.
+</details>
+
+<details>
+  <summary><strong>Logs not appearing</strong></summary>
+  
+  *   Check the log file at `~/.local/share/grabtext/grabtext.log`.
+  *   Ensure you have write permissions in the log directory.
+  *   Try using `grabtext logs --errors` to see error messages.
+</details>
 
 <details>
   <summary><strong>The shortcut was not created automatically. How do I configure it manually?</strong></summary>
@@ -313,6 +265,33 @@ You can force the OCR language (between English `en` and Portuguese `pt`) using 
   
   GrabText now generates a log file named `grabtext.log` in the project directory. This log is always in English and has a clean, structured format, which facilitates the identification and debugging of any issues that may arise during the tool's execution. You can consult it for detailed information about the OCR process and other operations.
 </details>
+
+For more help, run `grabtext help` or check the specific command help with `grabtext <command> --help`. When reporting issues, you can use `grabtext --debug` to get more detailed output that will help diagnose the problem.
+
+### Manual Installation and Prerequisites
+
+If the `install.sh` script encounters any errors, you can manually install the dependencies with the following commands:
+
+#### For Arch Linux and derivatives (Manjaro, EndeavourOS)
+```bash
+sudo pacman -S flameshot tesseract tesseract-data-por tesseract-data-eng xclip python-pip libnotify
+```
+
+#### For Debian, Ubuntu, and derivatives (Mint, Pop!_OS)
+```bash
+sudo apt install flameshot tesseract-ocr tesseract-ocr-por tesseract-ocr-eng xclip python3-pip libnotify-bin
+```
+
+#### For Fedora
+```bash
+sudo dnf install flameshot tesseract tesseract-langpack-por langpacks-eng xclip python3-pip libnotify
+```
+
+#### For openSUSE
+```bash
+sudo zypper install flameshot tesseract-ocr tesseract-ocr-data-por tesseract-ocr-eng xclip python3-pip libnotify-tools
+```
+After manual installation, continue with step 2 in the **Installation** section above.
 
 ---
 

@@ -45,7 +45,7 @@ Utiliza o **Tesseract** para o reconhecimento de caracteres e o **Flameshot** pa
 *   **Status do Sistema:** Verifique dependências e configuração
 *   **Processamento em Lote:** Manipule múltiplas imagens eficientemente
 
-## Uso da Linha de Comando
+## Comandos CLI
 
 A CLI do GrabText está organizada em comandos principais e comandos de utilidade para melhor usabilidade:
 
@@ -101,6 +101,16 @@ grabtext --dry-run                 # Mostrar o que seria feito sem executar
 
 ---
 
+## Variáveis de Ambiente
+
+As seguintes variáveis de ambiente podem ser usadas para configurar o GrabText:
+
+*   `GRABTEXT_LANG`: Define o idioma padrão do OCR (`en` ou `pt`)
+*   `GRABTEXT_LOG`: Define localização personalizada do arquivo de log (padrão: `~/.local/share/grabtext/grabtext.log`)
+*   `GRABTEXT_NO_NOTIFY`: Desativa notificações do desktop quando definido como `1`
+
+---
+
 ## Compatibilidade
 
 Este projeto foi desenvolvido e testado para funcionar nos principais ambientes de desktop Linux. A automação de atalhos é mais eficaz nos seguintes ambientes:
@@ -129,98 +139,6 @@ Este projeto foi desenvolvido e testado para funcionar nos principais ambientes 
     ./install.sh
     ```
     O script irá pedir sua senha para instalar os pacotes de sistema (se ainda não estiverem instalados) e irá configurar o restante do ambiente.
-
----
-
-## Novos Comandos
-
-### Status do Sistema (`grabtext status`)
-Verifique dependências do sistema, ambiente Python e configuração:
-```bash
-grabtext status                    # Mostrar status completo do sistema
-```
-
-### Configuração (`grabtext config`)
-Exibir configuração atual e variáveis de ambiente:
-```bash
-grabtext config                    # Mostrar configuração detalhada
-```
-
-### Comando Process (`grabtext process`)
-Processar imagens ou diretórios existentes com opções avançadas:
-```bash
-grabtext process imagem.png        # Processar imagem única
-grabtext process ./imagens -r      # Processar diretório recursivamente
-grabtext process ./imagens -f json # Saída em formato JSON
-grabtext process ./imagens --batch # Processar múltiplas imagens
-```
-
-### Comando Monitor (`grabtext monitor`)
-Monitorar diretórios por novas imagens e processá-las automaticamente:
-```bash
-grabtext monitor ./imagens         # Monitorar diretório
-grabtext monitor ./imagens -r      # Monitorar recursivamente
-grabtext monitor ./imagens -f csv  # Saída em formato CSV
-```
-
-## Variáveis de Ambiente
-
-As seguintes variáveis de ambiente podem ser usadas para configurar o GrabText:
-
-*   `GRABTEXT_LANG`: Define o idioma padrão do OCR (`en` ou `pt`)
-*   `GRABTEXT_LOG`: Define localização personalizada do arquivo de log (padrão: `~/.local/share/grabtext/grabtext.log`)
-*   `GRABTEXT_NO_NOTIFY`: Desativa notificações do desktop quando definido como `1`
-
-## Solução de Problemas
-
-Problemas comuns e soluções:
-
-1.  **OCR não funciona corretamente:**
-    - Certifique-se que a imagem tem bom contraste e não está borrada
-    - Tente mudar o idioma do OCR com a flag `-l`
-    - Verifique se o tesseract está instalado corretamente
-
-2.  **Comando não encontrado:**
-    - Verifique se `~/.local/bin` está no seu PATH
-    - Tente executar `source ~/.bashrc` ou reinicie seu terminal
-    - Execute novamente o script de instalação
-
-3.  **Captura GUI não funciona:**
-    - Verifique se o Flameshot está instalado e em execução
-    - Certifique-se de estar em um ambiente gráfico
-    - Tente reiniciar o serviço do Flameshot
-
-4.  **Logs não aparecem:**
-    - Verifique o arquivo de log em `~/.local/share/grabtext/grabtext.log`
-    - Certifique-se de ter permissões de escrita no diretório de log
-    - Tente usar `grabtext logs --errors` para ver mensagens de erro
-
-Para mais ajuda, execute `grabtext help` ou verifique a ajuda específica do comando com `grabtext <comando> --help`. Ao reportar problemas, você pode usar `grabtext --debug` para obter uma saída mais detalhada que ajudará a diagnosticar o problema.
-
-## Instalação Manual e Pré-requisitos
-
-Caso o script `install.sh` encontre algum erro, você pode instalar as dependências manualmente com os seguintes comandos:
-
-#### Para Arch Linux e derivados (Manjaro, EndeavourOS)
-```bash
-sudo pacman -S flameshot tesseract tesseract-data-por tesseract-data-eng xclip python-pip libnotify
-```
-
-#### Para Debian, Ubuntu e derivados (Mint, Pop!_OS)
-```bash
-sudo apt install flameshot tesseract-ocr tesseract-ocr-por tesseract-ocr-eng xclip python3-pip libnotify-bin
-```
-
-#### Para Fedora
-```bash
-sudo dnf install flameshot tesseract tesseract-langpack-por langpacks-eng xclip python3-pip libnotify
-```
-
-#### Para openSUSE
-```bash
-sudo zypper install flameshot tesseract-ocr tesseract-ocr-data-por tesseract-ocr-eng xclip python3-pip libnotify-tools
-```
-Após a instalação manual, continue no passo 2 da seção de **Instalação** acima.
 
 ---
 
@@ -253,7 +171,41 @@ Você pode forçar o idioma do OCR (entre inglês `en` e português `pt`) usando
 
 ---
 
-## Solução de Problemas e FAQ
+## Solução de Problemas
+
+Problemas comuns e soluções:
+
+<details>
+  <summary><strong>OCR não funciona corretamente</strong></summary>
+  
+  *   Certifique-se que a imagem tem bom contraste e não está borrada.
+  *   Tente mudar o idioma do OCR com a flag `-l`.
+  *   Verifique se o Tesseract está instalado corretamente.
+</details>
+
+<details>
+  <summary><strong>Comando não encontrado</strong></summary>
+  
+  *   Verifique se `~/.local/bin` está no seu PATH.
+  *   Tente executar `source ~/.bashrc` ou reiniciar seu terminal.
+  *   Execute novamente o script de instalação.
+</details>
+
+<details>
+  <summary><strong>Captura GUI não funciona</strong></summary>
+  
+  *   Verifique se o Flameshot está instalado e em execução.
+  *   Certifique-se de estar em um ambiente gráfico.
+  *   Tente reiniciar o serviço do Flameshot.
+</details>
+
+<details>
+  <summary><strong>Logs não aparecem</strong></summary>
+  
+  *   Verifique o arquivo de log em `~/.local/share/grabtext/grabtext.log`.
+  *   Certifique-se de ter permissões de escrita no diretório de log.
+  *   Tente usar `grabtext logs --errors` para ver mensagens de erro.
+</details>
 
 <details>
   <summary><strong>O atalho não foi criado automaticamente. Como configuro manualmente?</strong></summary>
@@ -261,9 +213,9 @@ Você pode forçar o idioma do OCR (entre inglês `en` e português `pt`) usando
   Se a automação falhou ou foi pulada, você pode configurar o atalho manualmente em poucos passos. O comando que você precisará usar é o caminho absoluto para o script `launch.sh`, que o instalador criou para você.
   
   **Exemplo do Comando:** `/home/seu-usuario/'Área de trabalho'/GrabText/launch.sh`
-  
+
   Siga o guia correspondente ao seu ambiente de trabalho:
-  
+
   #### Para GNOME (Ubuntu, Fedora)
   1.  Abra **Configurações** > **Teclado** > **Atalhos de Teclado**.
   2.  Role até **Atalhos Personalizados** e clique no `+`.
@@ -272,7 +224,7 @@ Você pode forçar o idioma do OCR (entre inglês `en` e português `pt`) usando
       * **Comando:** Insira o caminho completo para o arquivo `launch.sh`.
       * **Atalho:** Pressione a tecla `INSERT`.
   4.  Clique em "Adicionar".
-  
+
   #### Para KDE Plasma
   1.  Abra **Configurações do Sistema** > **Atalhos** > **Atalhos Personalizados**.
   2.  Vá em `Editar` > `Novo` > `Atalho Global` > `Comando/URL`.
@@ -281,7 +233,7 @@ Você pode forçar o idioma do OCR (entre inglês `en` e português `pt`) usando
       * Aba **Gatilho**: Pressione a tecla `INSERT`.
       * Aba **Ação**: No campo "Comando/URL", insira o caminho completo para o `launch.sh`.
   4.  Clique em "Aplicar".
-  
+
   #### Para XFCE
   1.  Vá para **Configurações** > **Teclado** > **Atalhos de aplicativos**.
   2.  Clique em **"Adicionar"**.
@@ -293,9 +245,9 @@ Você pode forçar o idioma do OCR (entre inglês `en` e português `pt`) usando
   <summary><strong>O OCR não extrai nenhum texto ou o resultado sai incorreto.</strong></summary>
   
   A qualidade do OCR depende 99% da qualidade da imagem. Lembre-se das boas práticas:
-  * **Alto Contraste:** Texto escuro sobre fundo claro e sólido funciona melhor.
-  * **Fontes Padrão:** Fontes muito artísticas ou pequenas são difíceis de ler.
-  * **Boa Resolução:** Se o texto na tela estiver pequeno, use o zoom (`Ctrl` + `+`) na aplicação antes de capturar a tela.
+  *   **Alto Contraste:** Texto escuro sobre fundo claro e sólido funciona melhor.
+  *   **Fontes Padrão:** Fontes muito artísticas ou pequenas são difíceis de ler.
+  *   **Boa Resolução:** Se o texto na tela estiver pequeno, use o zoom (`Ctrl` + `+`) na aplicação antes de capturar a tela.
 </details>
 
 <details>
@@ -313,6 +265,33 @@ Você pode forçar o idioma do OCR (entre inglês `en` e português `pt`) usando
   
   O GrabText agora gera um arquivo de log chamado `grabtext.log` no diretório do projeto. Este log é sempre em inglês e possui um formato limpo e estruturado, o que facilita a identificação e depuração de quaisquer problemas que possam surgir durante a execução da ferramenta. Você pode consultá-lo para obter informações detalhadas sobre o processo de OCR e outras operações.
 </details>
+
+Para mais ajuda, execute `grabtext help` ou verifique a ajuda específica do comando com `grabtext <comando> --help`. Ao reportar problemas, você pode usar `grabtext --debug` para obter uma saída mais detalhada que ajudará a diagnosticar o problema.
+
+### Instalação Manual e Pré-requisitos
+
+Caso o script `install.sh` encontre algum erro, você pode instalar as dependências manualmente com os seguintes comandos:
+
+#### Para Arch Linux e derivados (Manjaro, EndeavourOS)
+```bash
+sudo pacman -S flameshot tesseract tesseract-data-por tesseract-data-eng xclip python-pip libnotify
+```
+
+#### Para Debian, Ubuntu e derivados (Mint, Pop!_OS)
+```bash
+sudo apt install flameshot tesseract-ocr tesseract-ocr-por tesseract-ocr-eng xclip python3-pip libnotify-bin
+```
+
+#### Para Fedora
+```bash
+sudo dnf install flameshot tesseract tesseract-langpack-por langpacks-eng xclip python3-pip libnotify
+```
+
+#### Para openSUSE
+```bash
+sudo zypper install flameshot tesseract-ocr tesseract-ocr-data-por tesseract-ocr-eng xclip python3-pip libnotify-tools
+```
+Após a instalação manual, continue no passo 2 da seção de **Instalação** acima.
 
 ---
 
