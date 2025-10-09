@@ -212,7 +212,7 @@ Common issues and solutions:
   
   If automation failed or was skipped, you can configure the shortcut manually in a few steps. The command you'll need to use is the absolute path to the `launch.sh` script, which the installer created for you.
   
-  **Example Command:** `/home/gabriel/GrabText/launch.sh grab`
+  **Example Command:** `/home/$USER/GrabText/launch.sh grab`
 
   Follow the guide corresponding to your desktop environment:
 
@@ -221,7 +221,7 @@ Common issues and solutions:
   2.  Scroll to **Custom Shortcuts** and click the `+`.
   3.  Fill in the fields:
       * **Name:** `GrabText`
-      * **Command:** Enter the full path to the `launch.sh` file, followed by `grab`. For example, `/home/gabriel/GrabText/launch.sh grab`.
+      * **Command:** Enter the full path to the `launch.sh` file, followed by `grab`. For example, `/home/$USER/GrabText/launch.sh grab`.
       * **Shortcut:** Press the `INSERT` key.
   4.  Click "Add".
 
@@ -231,13 +231,13 @@ Common issues and solutions:
   3.  Fill in the fields:
       * **Name:** `GrabText`
       * **Trigger** tab: Press the `INSERT` key.
-      * **Action** tab: In the "Command/URL" field, enter the full path to the `launch.sh` file, followed by `grab`. For example, `/home/gabriel/GrabText/launch.sh grab`.
+      * **Action** tab: In the "Command/URL" field, enter the full path to the `launch.sh` file, followed by `grab`. For example, `/home/$USER/GrabText/launch.sh grab`.
   4.  Click "Apply".
 
   #### For XFCE
   1.  Go to **Settings** > **Keyboard** > **Application Shortcuts**.
   2.  Click **"Add"**.
-  3.  In the "Command" field, enter the full path to the `launch.sh` file, followed by `grab`. For example, `/home/gabriel/GrabText/launch.sh grab`.
+  3.  In the "Command" field, enter the full path to the `launch.sh` file, followed by `grab`. For example, `/home/$USER/GrabText/launch.sh grab`.
   4.  When the system asks for the key, press `INSERT`.
 </details>
 
