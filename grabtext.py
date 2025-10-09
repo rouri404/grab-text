@@ -3,6 +3,7 @@
 
 import sys
 import io
+import tempfile
 import subprocess
 import pytesseract
 from PIL import Image
@@ -21,7 +22,7 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 LOG_FILE = os.path.join(SCRIPT_DIR, 'grabtext.log')
 CONFIG_FILE = os.path.join(SCRIPT_DIR, '.grabtext_config')
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 
 logging.basicConfig(
     filename=LOG_FILE,
@@ -883,7 +884,8 @@ def handle_grab_command(args):
             )
 
         try:
-            screenshot_process = subprocess.Popen(['flameshot', 'gui', '--raw', '--print-stdout'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # Prefer stdout capture (Flameshot v13+ supports --raw to stdout)
+            screenshot_process = subprocess.Popen(['flameshot', 'gui', '--raw'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             image_data, stderr = screenshot_process.communicate()
 
             if screenshot_process.returncode != 0:
@@ -899,10 +901,40 @@ def handle_grab_command(args):
                             icon_name="dialog-error"
                         )
                 return
-            
+
+            # If no image data received on stdout, fallback to temp file approach
             if not image_data:
-                logging.warning(LOG_MESSAGES['NO_IMAGE_DATA'])
-                return
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+                    temp_path = tmp_file.name
+                try:
+                    fallback_proc = subprocess.Popen(['flameshot', 'gui', '-p', temp_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    _, fb_stderr = fallback_proc.communicate()
+                    if fallback_proc.returncode != 0:
+                        error_message = fb_stderr.decode('utf-8').strip()
+                        if "User cancelled" in error_message or "Operação cancelada pelo usuário" in error_message:
+                            logging.info("Screenshot cancelled by user (fallback).")
+                        else:
+                            logging.error(f"Flameshot error (fallback): {error_message}")
+                            if not args.silent:
+                                send_notification(
+                                    get_message('grabtext_error_title'),
+                                    get_message('unexpected_error_content', preview=error_message[:100]),
+                                    icon_name="dialog-error"
+                                )
+                        return
+
+                    if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
+                        logging.warning(LOG_MESSAGES['NO_IMAGE_DATA'])
+                        return
+
+                    with open(temp_path, 'rb') as f:
+                        image_data = f.read()
+                finally:
+                    try:
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+                    except Exception:
+                        pass
 
             img = Image.open(io.BytesIO(image_data))
             lang_code_to_use = args.lang if args.lang else current_lang_code

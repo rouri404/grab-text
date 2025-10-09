@@ -1,7 +1,7 @@
 <div align="center">
   <h1>GrabText</h1>
   <p>
-    <img src="https://img.shields.io/badge/version-1.3.1-blue" alt="Version">
+    <img src="https://img.shields.io/badge/version-1.3.2-blue" alt="Version">
     <img src="https://img.shields.io/badge/Platform-Linux-lightgrey" alt="Platform">
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
     <img src="https://img.shields.io/badge/status-ativo-success" alt="Status">

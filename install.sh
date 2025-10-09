@@ -71,108 +71,41 @@ info "$MSG_CREATE_LAUNCH_SCRIPT"
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Create launch script
-cat > launch.sh << EOLSCRIPT
+cat > launch.sh << 'EOLSCRIPT'
 #!/bin/bash
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_EXEC="${INSTALL_DIR}/.venv/bin/python"
 GRABTEXT_SCRIPT="${INSTALL_DIR}/grabtext.py"
 
-# Language will be determined by the Python script from .grabtext_config file
-
-# Set path to include common locations for required tools
+# Ensure PATH has common locations
 export PATH=/usr/bin:/bin:/usr/local/bin:/usr/sbin:/sbin:$HOME/.local/bin:$PATH
 
-# Check for GUI environment and tools
-has_display() {
-    # First check if DISPLAY is set
-    [ -n "$DISPLAY" ] || return 1
-    
-    # Then check if we can query X server
-    if command -v xdpyinfo >/dev/null 2>&1; then
-        xdpyinfo >/dev/null 2>&1
-        return $?
-    elif command -v xhost >/dev/null 2>&1; then
-        xhost >/dev/null 2>&1
-        return $?
-    fi
-    
-    # If no X tools available, check Wayland
-    [ -n "$WAYLAND_DISPLAY" ]
-    return $?
-}
-
-has_gui_tools() {
-    # Check if essential GUI tools are available
-    command -v flameshot >/dev/null 2>&1 || return 1
-    command -v notify-send >/dev/null 2>&1 || return 1
-    return 0
-}
-
-# Debug information (if needed)
-if [ "$1" = "--debug" ]; then
-    echo "Install directory: $INSTALL_DIR"
-    echo "Python executable: $PYTHON_EXEC"
-    echo "Script path: $GRABTEXT_SCRIPT"
-    echo "Current directory: $(pwd)"
-    echo "Display available: $(has_display && echo 'yes' || echo 'no')"
-    exit 0
-fi
-
-# Check installation directory
+# Validate installation directory
 if [ ! -d "$INSTALL_DIR" ]; then
-    notify-send "GrabText Error" "Installation directory not found: $INSTALL_DIR"
-    exit 1
+	notify-send "GrabText Error" "Installation directory not found: $INSTALL_DIR" 2>/dev/null || true
+	echo "Installation directory not found: $INSTALL_DIR" >&2
+	exit 1
 fi
 
-# Check required files
-if [ ! -f "$PYTHON_EXEC" ]; then
-    notify-send "GrabText Error" "Python environment not found. Try reinstalling GrabText."
-    echo "Missing: $PYTHON_EXEC" >&2
-    exit 1
+# Validate Python venv
+if [ ! -x "$PYTHON_EXEC" ]; then
+	notify-send "GrabText Error" "Python environment not found. Run ./install.sh in $INSTALL_DIR" 2>/dev/null || true
+	echo "Python environment not found at: $PYTHON_EXEC" >&2
+	exit 1
 fi
 
+# Validate script
 if [ ! -f "$GRABTEXT_SCRIPT" ]; then
-    notify-send "GrabText Error" "Script not found. Try reinstalling GrabText."
-    echo "Missing: $GRABTEXT_SCRIPT" >&2
-    exit 1
+	notify-send "GrabText Error" "Script not found. Expected: $GRABTEXT_SCRIPT" 2>/dev/null || true
+	echo "Script not found: $GRABTEXT_SCRIPT" >&2
+	exit 1
 fi
 
-# Execute command
-if [ "$1" = "grab" ] || [ "$1" = "--gui" ]; then
-    # Check GUI requirements
-    if ! has_display; then
-        echo "Error: No display available. X11 or Wayland is required for GUI operations." >&2
-        exit 1
-    fi
-
-    if ! has_gui_tools; then
-        echo "Error: Required GUI tools (flameshot, notify-send) are not installed." >&2
-        exit 1
-    fi
-
-    # GUI Mode - Use temporary file to handle the screenshot
-    TEMP_IMG=$(mktemp -t grabtext-XXXXXX.png)
-    cleanup() {
-        rm -f "$TEMP_IMG"
-    }
-    trap cleanup EXIT
-
-    # Capture screenshot to temp file
-    if flameshot gui --raw > "$TEMP_IMG"; then
-        if [ -s "$TEMP_IMG" ]; then  # Check if file is not empty
-            # Process the image with Python
-            "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" grab -i "$TEMP_IMG" --clipboard
-        else
-            echo "No image captured." >&2
-            exit 1
-        fi
-    fi
-elif [ -z "$1" ]; then
-    # No arguments - show help
-    "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" help
+# Delegate to Python script
+if [ $# -eq 0 ]; then
+	"$PYTHON_EXEC" "$GRABTEXT_SCRIPT"
 else
-    # CLI Mode - pass all arguments
-    "$PYTHON_EXEC" "$GRABTEXT_SCRIPT" "$@"
+	"$PYTHON_EXEC" "$GRABTEXT_SCRIPT" "$@"
 fi
 EOLSCRIPT
 
