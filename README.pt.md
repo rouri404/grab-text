@@ -375,6 +375,136 @@ Problemas comuns e soluções:
   O GrabText agora gera um arquivo de log chamado `grabtext.log` no diretório do projeto. Este log é sempre em inglês e possui um formato limpo e estruturado, o que facilita a identificação e depuração de quaisquer problemas que possam surgir durante a execução da ferramenta. Você pode consultá-lo para obter informações detalhadas sobre o processo de OCR e outras operações.
 </details>
 
+<details>
+  <summary><strong>Exportação JSON/CSV não está funcionando corretamente</strong></summary>
+  
+  *   Certifique-se de ter permissões de escrita no diretório de saída.
+  *   Verifique se o caminho do arquivo de saída é válido e acessível.
+  *   Para lotes grandes, o processo pode demorar - verifique os logs para acompanhar o progresso.
+  *   Verifique se as imagens contêm texto legível para resultados OCR significativos.
+  *   Use `grabtext --debug` para ver informações detalhadas de processamento.
+</details>
+
+<details>
+  <summary><strong>Arquivo CSV parece corrompido ou tem problemas de formatação</strong></summary>
+  
+  *   Arquivos CSV usam escape adequado para conteúdo de texto com vírgulas ou aspas.
+  *   Abra o arquivo CSV com um editor de texto primeiro para verificar a estrutura.
+  *   Importe no Excel/LibreOffice Calc usando "Texto para Colunas" se necessário.
+  *   Verifique se o conteúdo do texto não contém caracteres problemáticos.
+  *   Para arquivos CSV grandes, use um leitor CSV adequado em vez de abrir diretamente no Excel.
+  *   Se o texto contém quebras de linha, certifique-se de que seu leitor CSV lida com células multilinhas corretamente.
+</details>
+
+<details>
+  <summary><strong>Baixa confiança OCR ou reconhecimento de texto ruim</strong></summary>
+  
+  *   **Qualidade da Imagem**: Certifique-se de alto contraste entre texto e fundo.
+  *   **Resolução**: Use imagens de maior resolução ou aplique zoom antes de capturar.
+  *   **Configurações de Idioma**: Tente alternar entre idiomas `pt` e `en`.
+  *   **Pré-processamento de Imagem**: Considere recortar para focar apenas nas áreas de texto.
+  *   **Tipo de Fonte**: Fontes padrão funcionam melhor que texto decorativo ou manuscrito.
+  *   **Verificar Confiança**: Use saída JSON para ver pontuações de confiança e identificar imagens problemáticas.
+</details>
+
+<details>
+  <summary><strong>Processamento em lote está lento ou travando</strong></summary>
+  
+  *   **Imagens Grandes**: Reduza a resolução das imagens antes de processar arquivos grandes.
+  *   **Uso de Memória**: Feche outras aplicações para liberar RAM.
+  *   **Monitoramento de Progresso**: Use `grabtext logs --tail 10` para monitorar o progresso.
+  *   **Interromper com Segurança**: Use Ctrl+C para parar o processamento graciosamente.
+  *   **Resultados Parciais**: Verifique se arquivos de saída foram criados com resultados parciais.
+  *   **Recursos do Sistema**: Monitore uso de CPU e memória durante o processamento.
+</details>
+
+<details>
+  <summary><strong>Erros de permissão ao salvar arquivos</strong></summary>
+  
+  *   **Permissões de Diretório**: Certifique-se de acesso de escrita ao diretório de saída.
+  *   **Permissões de Arquivo**: Verifique se o arquivo de saída está bloqueado por outra aplicação.
+  *   **Espaço em Disco**: Verifique se há espaço suficiente disponível.
+  *   **Comprimento do Caminho**: Evite caminhos de arquivo extremamente longos.
+  *   **Caracteres Especiais**: Evite caracteres especiais em nomes de arquivo de saída.
+  *   **Diretório Raiz**: Não tente escrever em diretórios protegidos do sistema.
+</details>
+
+<details>
+  <summary><strong>Problemas de memória com processamento em lote grande</strong></summary>
+  
+  *   **Processar em Lotes Menores**: Divida diretórios grandes em grupos menores.
+  *   **Monitorar Recursos do Sistema**: Use `htop` ou `top` para monitorar uso de memória.
+  *   **Fechar Outras Aplicações**: Libere RAM antes de processar lotes grandes.
+  *   **Usar Processamento Recursivo**: Processe subdiretórios separadamente em vez de todos de uma vez.
+  *   **Verificar Memória Disponível**: Certifique-se de pelo menos 2GB de RAM livre para operações de lote grandes.
+</details>
+
+<details>
+  <summary><strong>Saída JSON/CSV contém dados vazios ou incompletos</strong></summary>
+  
+  *   **Suporte a Formato de Imagem**: Certifique-se de que as imagens estão em formatos suportados (PNG, JPG, JPEG).
+  *   **Corrupção de Arquivo**: Verifique se os arquivos de imagem não estão corrompidos.
+  *   **Imagens Vazias**: Verifique se as imagens realmente contêm texto legível.
+  *   **Idioma OCR**: Tente configurações de idioma diferentes para melhor reconhecimento.
+  *   **Orientação da Imagem**: Gire imagens se o texto estiver de lado ou de cabeça para baixo.
+  *   **Modo Debug**: Use `grabtext --debug` para ver informações detalhadas de processamento.
+</details>
+
+<details>
+  <summary><strong>Comando monitor não está detectando novos arquivos</strong></summary>
+  
+  *   **Eventos do Sistema de Arquivos**: Alguns sistemas de arquivos podem não suportar monitoramento de arquivos.
+  *   **Permissões**: Certifique-se de acesso de leitura ao diretório monitorado.
+  *   **Extensões de Arquivo**: Apenas arquivos com extensões .png, .jpg, .jpeg são monitorados.
+  *   **Unidades de Rede**: O monitoramento de arquivos pode não funcionar em diretórios montados em rede.
+  *   **Monitoramento Recursivo**: Use a flag `-r` para monitoramento de subdiretórios.
+  *   **Teste Manual**: Teste primeiro com o comando `grabtext process`.
+</details>
+
+<details>
+  <summary><strong>Alternância de idioma não está funcionando corretamente</strong></summary>
+  
+  *   **Dados do Tesseract**: Certifique-se de que os pacotes de dados de idioma estão instalados:
+    - `tesseract-ocr-eng` e `tesseract-ocr-por` para inglês e português
+  *   **Arquivo de Configuração**: Verifique `~/.local/share/grabtext/.grabtext_config` para configuração de idioma.
+  *   **Variável de Ambiente**: Verifique se `GRABTEXT_LANG` está definida corretamente.
+  *   **Sobrescrever Linha de Comando**: Use `-l pt` ou `-l en` para sobrescrever o idioma padrão.
+  *   **Instalação do Tesseract**: Reinstale o Tesseract se a alternância de idioma falhar.
+</details>
+
+<details>
+  <summary><strong>Problemas de desempenho e dicas de otimização</strong></summary>
+  
+  *   **Tamanho do Lote**: Processe imagens em lotes de 50-100 para desempenho ótimo.
+  *   **Compressão de Imagem**: Comprima imagens grandes antes do processamento para reduzir uso de memória.
+  *   **Armazenamento SSD**: Use armazenamento SSD para operações I/O mais rápidas durante processamento em lote.
+  *   **Núcleos de CPU**: O GrabText pode se beneficiar de múltiplos núcleos de CPU para processamento paralelo.
+  *   **Armazenamento de Rede**: Evite processar imagens de diretórios montados em rede.
+  *   **Arquivos Temporários**: Certifique-se de espaço suficiente no diretório /tmp para operações temporárias.
+</details>
+
+<details>
+  <summary><strong>Integração com outras ferramentas e automação</strong></summary>
+  
+  *   **Scripts Shell**: Use GrabText em scripts shell para processamento automatizado de documentos.
+  *   **Trabalhos Cron**: Agende processamento em lote regular com cron para fluxos de trabalho automatizados.
+  *   **Integração de API**: Analise saída JSON para integração com serviços web ou bancos de dados.
+  *   **Integração Excel**: Importe arquivos CSV diretamente no Excel para análise adicional.
+  *   **Importação de Banco de Dados**: Use saída CSV para importações em massa de banco de dados.
+  *   **Automação de Fluxo de Trabalho**: Combine com outras ferramentas OCR para tipos de documento especializados.
+</details>
+
+<details>
+  <summary><strong>Depuração avançada e diagnósticos</strong></summary>
+  
+  *   **Logging Detalhado**: Use `grabtext --verbose` para informações detalhadas de operação.
+  *   **Modo Debug**: Habilite `grabtext --debug` para ver detalhes internos de processamento.
+  *   **Análise de Log**: Use `grabtext logs --filter ERROR` para encontrar padrões de erro específicos.
+  *   **Monitoramento do Sistema**: Monitore recursos do sistema durante operações de lote grandes.
+  *   **Teste do Tesseract**: Teste o Tesseract diretamente com `tesseract imagem.png output -l por`.
+  *   **Verificação de Dependências**: Use `grabtext status` para verificar se todas as dependências estão funcionando.
+</details>
+
 Para mais ajuda, execute `grabtext help` ou verifique a ajuda específica do comando com `grabtext <comando> --help`. Ao reportar problemas, você pode usar `grabtext --debug` para obter uma saída mais detalhada que ajudará a diagnosticar o problema.
 
 ---

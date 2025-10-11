@@ -435,6 +435,117 @@ Common issues and solutions:
   *   Open the CSV file with a text editor first to verify the structure.
   *   Import into Excel/LibreOffice Calc using "Text to Columns" if needed.
   *   Check that the text content doesn't contain problematic characters.
+  *   For large CSV files, use a proper CSV reader instead of opening directly in Excel.
+  *   If text contains newlines, ensure your CSV reader handles multiline cells correctly.
+</details>
+
+<details>
+  <summary><strong>Low OCR confidence or poor text recognition</strong></summary>
+  
+  *   **Image Quality**: Ensure high contrast between text and background.
+  *   **Resolution**: Use higher resolution images or zoom in before capturing.
+  *   **Language Settings**: Try switching between `pt` and `en` languages.
+  *   **Image Preprocessing**: Consider cropping to focus only on text areas.
+  *   **Font Type**: Standard fonts work better than decorative or handwritten text.
+  *   **Check Confidence**: Use JSON output to see confidence scores and identify problematic images.
+</details>
+
+<details>
+  <summary><strong>Batch processing is slow or hangs</strong></summary>
+  
+  *   **Large Images**: Reduce image resolution before processing large files.
+  *   **Memory Usage**: Close other applications to free up RAM.
+  *   **Progress Monitoring**: Use `grabtext logs --tail 10` to monitor progress.
+  *   **Interrupt Safely**: Use Ctrl+C to stop processing gracefully.
+  *   **Partial Results**: Check if output files were created with partial results.
+  *   **System Resources**: Monitor CPU and memory usage during processing.
+</details>
+
+<details>
+  <summary><strong>Permission errors when saving files</strong></summary>
+  
+  *   **Directory Permissions**: Ensure write access to the output directory.
+  *   **File Permissions**: Check if output file is locked by another application.
+  *   **Disk Space**: Verify sufficient disk space is available.
+  *   **Path Length**: Avoid extremely long file paths.
+  *   **Special Characters**: Avoid special characters in output filenames.
+  *   **Root Directory**: Don't try to write to system-protected directories.
+</details>
+
+<details>
+  <summary><strong>Memory issues with large batch processing</strong></summary>
+  
+  *   **Process in Smaller Batches**: Split large directories into smaller groups.
+  *   **Monitor System Resources**: Use `htop` or `top` to monitor memory usage.
+  *   **Close Other Applications**: Free up RAM before processing large batches.
+  *   **Use Recursive Processing**: Process subdirectories separately instead of all at once.
+  *   **Check Available Memory**: Ensure at least 2GB free RAM for large batch operations.
+</details>
+
+<details>
+  <summary><strong>JSON/CSV output contains empty or incomplete data</strong></summary>
+  
+  *   **Image Format Support**: Ensure images are in supported formats (PNG, JPG, JPEG).
+  *   **File Corruption**: Verify image files are not corrupted.
+  *   **Empty Images**: Check if images actually contain readable text.
+  *   **OCR Language**: Try different language settings for better recognition.
+  *   **Image Orientation**: Rotate images if text is sideways or upside down.
+  *   **Debug Mode**: Use `grabtext --debug` to see detailed processing information.
+</details>
+
+<details>
+  <summary><strong>Monitor command not detecting new files</strong></summary>
+  
+  *   **File System Events**: Some file systems may not support file monitoring.
+  *   **Permissions**: Ensure read access to the monitored directory.
+  *   **File Extensions**: Only files with .png, .jpg, .jpeg extensions are monitored.
+  *   **Network Drives**: File monitoring may not work on network-mounted directories.
+  *   **Recursive Monitoring**: Use `-r` flag for subdirectory monitoring.
+  *   **Manual Testing**: Test with `grabtext process` command first.
+</details>
+
+<details>
+  <summary><strong>Language switching not working properly</strong></summary>
+  
+  *   **Tesseract Data**: Ensure language data packages are installed:
+    - `tesseract-ocr-eng` and `tesseract-ocr-por` for English and Portuguese
+  *   **Configuration File**: Check `~/.local/share/grabtext/.grabtext_config` for language setting.
+  *   **Environment Variable**: Verify `GRABTEXT_LANG` is set correctly.
+  *   **Command Line Override**: Use `-l pt` or `-l en` to override default language.
+  *   **Tesseract Installation**: Reinstall Tesseract if language switching fails.
+</details>
+
+<details>
+  <summary><strong>Performance issues and optimization tips</strong></summary>
+  
+  *   **Batch Size**: Process images in batches of 50-100 for optimal performance.
+  *   **Image Compression**: Compress large images before processing to reduce memory usage.
+  *   **SSD Storage**: Use SSD storage for faster I/O operations during batch processing.
+  *   **CPU Cores**: GrabText can benefit from multiple CPU cores for parallel processing.
+  *   **Network Storage**: Avoid processing images from network-mounted directories.
+  *   **Temporary Files**: Ensure sufficient space in /tmp directory for temporary operations.
+</details>
+
+<details>
+  <summary><strong>Integration with other tools and automation</strong></summary>
+  
+  *   **Shell Scripts**: Use GrabText in shell scripts for automated document processing.
+  *   **Cron Jobs**: Schedule regular batch processing with cron for automated workflows.
+  *   **API Integration**: Parse JSON output for integration with web services or databases.
+  *   **Excel Integration**: Import CSV files directly into Excel for further analysis.
+  *   **Database Import**: Use CSV output for bulk database imports.
+  *   **Workflow Automation**: Combine with other OCR tools for specialized document types.
+</details>
+
+<details>
+  <summary><strong>Advanced debugging and diagnostics</strong></summary>
+  
+  *   **Verbose Logging**: Use `grabtext --verbose` for detailed operation information.
+  *   **Debug Mode**: Enable `grabtext --debug` to see internal processing details.
+  *   **Log Analysis**: Use `grabtext logs --filter ERROR` to find specific error patterns.
+  *   **System Monitoring**: Monitor system resources during large batch operations.
+  *   **Tesseract Testing**: Test Tesseract directly with `tesseract image.png output -l eng`.
+  *   **Dependency Verification**: Use `grabtext status` to verify all dependencies are working.
 </details>
 
 For more help, run `grabtext help` or check the specific command help with `grabtext <command> --help`. When reporting issues, you can use `grabtext --debug` to get more detailed output that will help diagnose the problem.
