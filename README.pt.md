@@ -1,7 +1,7 @@
 <div align="center">
   <h1>GrabText</h1>
   <p>
-    <img src="https://img.shields.io/badge/version-1.3.2-blue" alt="Version">
+    <img src="https://img.shields.io/badge/version-1.3.3-blue" alt="Version">
     <img src="https://img.shields.io/badge/Platform-Linux-lightgrey" alt="Platform">
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
     <img src="https://img.shields.io/badge/status-ativo-success" alt="Status">
@@ -41,9 +41,10 @@ Utiliza o **Tesseract** para o reconhecimento de caracteres e o **Flameshot** pa
 *   **Processamento de Imagens:** Processe imagens individuais ou diretórios inteiros
 *   **Monitoramento de Diretórios:** Observe pastas por novas imagens para processar
 *   **Múltiplos Formatos de Saída:** Suporte para saídas em texto, JSON e CSV
+*   **Exportação de Dados Estruturados:** Formatos JSON e CSV ricos com metadados e confiança OCR
 *   **Gerenciamento Avançado de Logs:** Filtre, exporte e analise arquivos de log
 *   **Status do Sistema:** Verifique dependências e configuração
-*   **Processamento em Lote:** Manipule múltiplas imagens eficientemente
+*   **Processamento em Lote:** Manipule múltiplas imagens eficientemente com estruturas de dados unificadas
 
 ## Comandos CLI
 
@@ -98,6 +99,114 @@ grabtext --debug                   # Ativar modo de depuração com saída detal
 grabtext --verbose                 # Mostrar informações detalhadas de progresso
 grabtext --dry-run                 # Mostrar o que seria feito sem executar
 ```
+
+---
+
+## Formatos de Exportação
+
+O GrabText suporta três formatos de saída, cada um otimizado para diferentes casos de uso:
+
+### Formato Texto (Padrão)
+Saída de texto simples - apenas o conteúdo do texto extraído.
+
+### Formato JSON
+Dados estruturados ricos com metadados abrangentes e informações OCR:
+
+```bash
+# Saída JSON de imagem única
+grabtext process imagem.png -f json
+
+# Saída JSON de processamento em lote
+grabtext process ./imagens -f json -o resultados.json
+```
+
+**Estrutura JSON:**
+```json
+{
+  "metadata": {
+    "filename": "documento.png",
+    "filepath": "/caminho/para/documento.png",
+    "file_size_bytes": 245760,
+    "file_modified": "2025-10-11T16:30:00.000000",
+    "image_width": 1920,
+    "image_height": 1080,
+    "image_format": "PNG",
+    "image_mode": "RGB"
+  },
+  "ocr": {
+    "text": "Conteúdo do texto extraído...",
+    "word_count": 25,
+    "char_count": 150,
+    "avg_confidence": 87.5,
+    "language_used": "por",
+    "has_text": true,
+    "processing_timestamp": "2025-10-11T16:35:00.000000"
+  },
+  "processing_info": {
+    "grabtext_version": "1.3.2",
+    "processed_at": "2025-10-11T16:35:00.000000"
+  }
+}
+```
+
+**Estrutura JSON em Lote:**
+```json
+{
+  "batch_info": {
+    "total_files": 5,
+    "processed_at": "2025-10-11T16:35:00.000000",
+    "directory": "/caminho/para/imagens",
+    "recursive": false,
+    "grabtext_version": "1.3.2",
+    "successfully_processed": 5
+  },
+  "results": [
+    { /* Dados individuais do arquivo como acima */ }
+  ]
+}
+```
+
+### Formato CSV
+Dados tabulares perfeitos para aplicações de planilha e análise de dados:
+
+```bash
+# Saída CSV de imagem única
+grabtext process imagem.png -f csv
+
+# Saída CSV de processamento em lote
+grabtext process ./imagens -f csv -o resultados.csv
+```
+
+**Colunas CSV:**
+- `filename`: Nome do arquivo de imagem
+- `filepath`: Caminho completo para a imagem
+- `file_size_bytes`: Tamanho do arquivo em bytes
+- `file_modified`: Timestamp da última modificação
+- `image_width`: Largura da imagem em pixels
+- `image_height`: Altura da imagem em pixels
+- `image_format`: Formato da imagem (PNG, JPEG, etc.)
+- `image_mode`: Modo de cor (RGB, RGBA, etc.)
+- `text`: Conteúdo do texto extraído
+- `word_count`: Número de palavras detectadas
+- `char_count`: Número de caracteres detectados
+- `avg_confidence`: Confiança média do OCR (0-100)
+- `language_used`: Idioma do OCR usado
+- `has_text`: Se texto foi detectado (true/false)
+- `processing_timestamp`: Quando o processamento ocorreu
+
+### Casos de Uso
+
+**Formato JSON é ideal para:**
+- Integrações de API e aplicações web
+- Análise de dados com linguagens de programação
+- Pipelines de processamento automatizado
+- Trilhas de auditoria detalhadas
+
+**Formato CSV é ideal para:**
+- Análise em planilhas (Excel, LibreOffice Calc)
+- Importações de banco de dados
+- Ferramentas de análise estatística
+- Revisão e comparação rápida de dados
 
 ---
 

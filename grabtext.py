@@ -22,7 +22,7 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 LOG_FILE = os.path.join(SCRIPT_DIR, 'grabtext.log')
 CONFIG_FILE = os.path.join(SCRIPT_DIR, '.grabtext_config')
 
-VERSION = "1.3.2"
+VERSION = "1.3.3"
 
 logging.basicConfig(
     filename=LOG_FILE,
@@ -620,20 +620,131 @@ class ImageHandler(FileSystemEventHandler):
         if not event.is_directory and event.src_path.lower().endswith(('.png', '.jpg', '.jpeg')):
             self.process_func(event.src_path)
 
+def get_image_metadata(image_path, img=None):
+    """Extrai metadados da imagem"""
+    try:
+        if img is None:
+            img = Image.open(image_path)
+        
+        # Obter informações do arquivo
+        file_stats = os.stat(image_path)
+        
+        metadata = {
+            'filename': os.path.basename(image_path),
+            'filepath': os.path.abspath(image_path),
+            'file_size_bytes': file_stats.st_size,
+            'file_modified': datetime.fromtimestamp(file_stats.st_mtime).isoformat(),
+            'image_width': img.width,
+            'image_height': img.height,
+            'image_format': img.format,
+            'image_mode': img.mode
+        }
+        
+        return metadata
+    except Exception as e:
+        logging.warning(f"Could not extract metadata for {image_path}: {e}")
+        return {
+            'filename': os.path.basename(image_path),
+            'filepath': os.path.abspath(image_path),
+            'error': str(e)
+        }
+
+def get_ocr_data(img, lang_code):
+    """Extrai dados OCR com informações de confiança"""
+    try:
+        # Obter dados OCR com confiança
+        data = pytesseract.image_to_data(img, lang=lang_code, output_type=pytesseract.Output.DICT)
+        
+        # Extrair texto
+        text = pytesseract.image_to_string(img, lang=lang_code).strip()
+        
+        # Calcular confiança média
+        confidences = [int(conf) for conf in data['conf'] if int(conf) > 0]
+        avg_confidence = sum(confidences) / len(confidences) if confidences else 0
+        
+        # Contar palavras e caracteres
+        word_count = len([word for word in data['text'] if word.strip()])
+        char_count = len(text)
+        
+        ocr_info = {
+            'text': text,
+            'word_count': word_count,
+            'char_count': char_count,
+            'avg_confidence': round(avg_confidence, 2),
+            'language_used': lang_code,
+            'has_text': bool(text),
+            'processing_timestamp': datetime.now().isoformat()
+        }
+        
+        return ocr_info
+    except Exception as e:
+        logging.error(f"OCR processing error: {e}")
+        return {
+            'text': '',
+            'word_count': 0,
+            'char_count': 0,
+            'avg_confidence': 0,
+            'language_used': lang_code,
+            'has_text': False,
+            'processing_timestamp': datetime.now().isoformat(),
+            'error': str(e)
+        }
+
 def process_image_file(image_path, format='text'):
     try:
         img = Image.open(image_path)
-        text = pytesseract.image_to_string(img, lang=tesseract_lang_code)
+        
+        # Obter metadados da imagem
+        metadata = get_image_metadata(image_path, img)
+        
+        # Obter dados OCR
+        ocr_data = get_ocr_data(img, tesseract_lang_code)
         
         if format == 'json':
-            return json.dumps({'file': image_path, 'text': text.strip()})
+            result = {
+                'metadata': metadata,
+                'ocr': ocr_data,
+                'processing_info': {
+                    'grabtext_version': VERSION,
+                    'processed_at': datetime.now().isoformat()
+                }
+            }
+            return json.dumps(result, indent=2, ensure_ascii=False)
+        
         elif format == 'csv':
             output = io.StringIO()
             writer = csv.writer(output)
-            writer.writerow([image_path, text.strip()])
+            
+            # Para CSV individual, incluir cabeçalho
+            writer.writerow([
+                'filename', 'filepath', 'file_size_bytes', 'file_modified',
+                'image_width', 'image_height', 'image_format', 'image_mode',
+                'text', 'word_count', 'char_count', 'avg_confidence',
+                'language_used', 'has_text', 'processing_timestamp'
+            ])
+            
+            writer.writerow([
+                metadata.get('filename', ''),
+                metadata.get('filepath', ''),
+                metadata.get('file_size_bytes', ''),
+                metadata.get('file_modified', ''),
+                metadata.get('image_width', ''),
+                metadata.get('image_height', ''),
+                metadata.get('image_format', ''),
+                metadata.get('image_mode', ''),
+                ocr_data.get('text', ''),
+                ocr_data.get('word_count', ''),
+                ocr_data.get('char_count', ''),
+                ocr_data.get('avg_confidence', ''),
+                ocr_data.get('language_used', ''),
+                ocr_data.get('has_text', ''),
+                ocr_data.get('processing_timestamp', '')
+            ])
             return output.getvalue()
+        
         else:
-            return text.strip()
+            return ocr_data.get('text', '')
+            
     except Exception as e:
         logging.error(f"Error processing {image_path}: {str(e)}")
         return None
@@ -642,11 +753,73 @@ def process_directory(dir_path, recursive=False, format='text'):
     pattern = '**/*' if recursive else '*'
     results = []
     path = Path(dir_path)
-    for img_path in path.glob(pattern):
-        if img_path.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+    processed_files = []
+    
+    # Coletar todos os arquivos de imagem primeiro
+    image_files = [p for p in path.glob(pattern) if p.suffix.lower() in ['.png', '.jpg', '.jpeg']]
+    
+    if format == 'json':
+        # Para JSON, criar uma estrutura unificada com todos os resultados
+        batch_data = {
+            'batch_info': {
+                'total_files': len(image_files),
+                'processed_at': datetime.now().isoformat(),
+                'directory': os.path.abspath(dir_path),
+                'recursive': recursive,
+                'grabtext_version': VERSION
+            },
+            'results': []
+        }
+        
+        for img_path in image_files:
+            result = process_image_file(str(img_path), format)
+            if result:
+                # Parse do JSON individual e adicionar à lista
+                try:
+                    individual_data = json.loads(result)
+                    batch_data['results'].append(individual_data)
+                    processed_files.append(str(img_path))
+                except json.JSONDecodeError:
+                    logging.error(f"Failed to parse JSON for {img_path}")
+        
+        batch_data['batch_info']['successfully_processed'] = len(processed_files)
+        return [json.dumps(batch_data, indent=2, ensure_ascii=False)]
+    
+    elif format == 'csv':
+        # Para CSV, criar um arquivo com cabeçalho e todos os dados
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Escrever cabeçalho
+        writer.writerow([
+            'filename', 'filepath', 'file_size_bytes', 'file_modified',
+            'image_width', 'image_height', 'image_format', 'image_mode',
+            'text', 'word_count', 'char_count', 'avg_confidence',
+            'language_used', 'has_text', 'processing_timestamp'
+        ])
+        
+        for img_path in image_files:
+            result = process_image_file(str(img_path), format)
+            if result:
+                # O resultado já inclui o cabeçalho, então precisamos extrair apenas os dados
+                lines = result.strip().split('\n')
+                if len(lines) > 1:  # Pular o cabeçalho
+                    # Usar csv.reader para lidar com vírgulas dentro do texto
+                    csv_reader = csv.reader([lines[1]])
+                    row = next(csv_reader)
+                    writer.writerow(row)
+                    processed_files.append(str(img_path))
+        
+        return [output.getvalue()]
+    
+    else:
+        # Para texto simples, manter comportamento original
+        for img_path in image_files:
             result = process_image_file(str(img_path), format)
             if result:
                 results.append(result)
+                processed_files.append(str(img_path))
+    
     return results
 
 def handle_status_command():

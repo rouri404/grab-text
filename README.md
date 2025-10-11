@@ -1,7 +1,7 @@
 <div align="center">
   <h1>GrabText</h1>
   <p>
-    <img src="https://img.shields.io/badge/version-1.3.2-blue" alt="Version">
+    <img src="https://img.shields.io/badge/version-1.3.3-blue" alt="Version">
     <img src="https://img.shields.io/badge/Platform-Linux-lightgrey" alt="Platform">
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
     <img src="https://img.shields.io/badge/status-active-success" alt="Status">
@@ -41,9 +41,10 @@ It utilizes **Tesseract** for character recognition and **Flameshot** for intuit
 *   **Image Processing:** Process single images or entire directories
 *   **Directory Monitoring:** Watch folders for new images to process
 *   **Multiple Output Formats:** Support for text, JSON, and CSV outputs
+*   **Structured Data Export:** Rich JSON and CSV formats with metadata and OCR confidence
 *   **Advanced Log Management:** Filter, export, and analyze log files
 *   **System Status:** Check dependencies and configuration
-*   **Batch Processing:** Handle multiple images efficiently
+*   **Batch Processing:** Handle multiple images efficiently with unified data structures
 
 ## CLI Commands
 
@@ -63,7 +64,8 @@ grabtext grab --dry-run           # Show what would be done
 # Process Existing Files
 grabtext process image.png        # Process single image
 grabtext process ./images -r      # Process directory recursively
-grabtext process ./images -f json # Output in JSON format
+grabtext process ./images -f json # Output in structured JSON format
+grabtext process ./images -f csv  # Output in structured CSV format
 grabtext process ./images --batch # Process multiple images
 
 # Monitor Directories
@@ -98,6 +100,114 @@ grabtext --debug                  # Enable debug mode with verbose output
 grabtext --verbose                # Show detailed progress information
 grabtext --dry-run                # Show what would be done without executing
 ```
+
+---
+
+## Export Formats
+
+GrabText supports three output formats, each optimized for different use cases:
+
+### Text Format (Default)
+Simple text output - just the extracted text content.
+
+### JSON Format
+Rich structured data with comprehensive metadata and OCR information:
+
+```bash
+# Single image JSON output
+grabtext process image.png -f json
+
+# Batch processing JSON output
+grabtext process ./images -f json -o results.json
+```
+
+**JSON Structure:**
+```json
+{
+  "metadata": {
+    "filename": "document.png",
+    "filepath": "/path/to/document.png",
+    "file_size_bytes": 245760,
+    "file_modified": "2025-10-11T16:30:00.000000",
+    "image_width": 1920,
+    "image_height": 1080,
+    "image_format": "PNG",
+    "image_mode": "RGB"
+  },
+  "ocr": {
+    "text": "Extracted text content...",
+    "word_count": 25,
+    "char_count": 150,
+    "avg_confidence": 87.5,
+    "language_used": "eng",
+    "has_text": true,
+    "processing_timestamp": "2025-10-11T16:35:00.000000"
+  },
+  "processing_info": {
+    "grabtext_version": "1.3.2",
+    "processed_at": "2025-10-11T16:35:00.000000"
+  }
+}
+```
+
+**Batch JSON Structure:**
+```json
+{
+  "batch_info": {
+    "total_files": 5,
+    "processed_at": "2025-10-11T16:35:00.000000",
+    "directory": "/path/to/images",
+    "recursive": false,
+    "grabtext_version": "1.3.2",
+    "successfully_processed": 5
+  },
+  "results": [
+    { /* Individual file data as above */ }
+  ]
+}
+```
+
+### CSV Format
+Tabular data perfect for spreadsheet applications and data analysis:
+
+```bash
+# Single image CSV output
+grabtext process image.png -f csv
+
+# Batch processing CSV output
+grabtext process ./images -f csv -o results.csv
+```
+
+**CSV Columns:**
+- `filename`: Image file name
+- `filepath`: Full path to the image
+- `file_size_bytes`: File size in bytes
+- `file_modified`: Last modification timestamp
+- `image_width`: Image width in pixels
+- `image_height`: Image height in pixels
+- `image_format`: Image format (PNG, JPEG, etc.)
+- `image_mode`: Color mode (RGB, RGBA, etc.)
+- `text`: Extracted text content
+- `word_count`: Number of words detected
+- `char_count`: Number of characters detected
+- `avg_confidence`: Average OCR confidence (0-100)
+- `language_used`: OCR language used
+- `has_text`: Whether text was detected (true/false)
+- `processing_timestamp`: When processing occurred
+
+### Use Cases
+
+**JSON Format is ideal for:**
+- API integrations and web applications
+- Data analysis with programming languages
+- Automated processing pipelines
+- Detailed audit trails
+
+**CSV Format is ideal for:**
+- Spreadsheet analysis (Excel, LibreOffice Calc)
+- Database imports
+- Statistical analysis tools
+- Quick data review and comparison
 
 ---
 
@@ -144,10 +254,52 @@ This project was developed and tested to work on major Linux desktop environment
 
 ## How to Use
 
+### GUI Mode (Default)
 1.  Press the `INSERT` key.
 2.  The capture interface will appear. Select the desired area of the screen with the text.
 3.  Press `Enter` or click the `✓` (Confirm) icon.
 4.  The extracted text will be in your clipboard, ready to be pasted with `Ctrl+V`.
+
+### CLI Mode Examples
+
+**Basic Text Extraction:**
+```bash
+# Extract text from screen area
+grabtext
+
+# Extract text from a specific image
+grabtext process document.png
+
+# Extract text and save to file
+grabtext process document.png -o extracted_text.txt
+```
+
+**Batch Processing:**
+```bash
+# Process all images in a directory
+grabtext process ./images -r
+
+# Export results in structured JSON format
+grabtext process ./images -f json -o batch_results.json
+
+# Export results in CSV format for spreadsheet analysis
+grabtext process ./images -f csv -o batch_results.csv
+```
+
+**Advanced Usage:**
+```bash
+# Process with specific language
+grabtext process document.png -l pt
+
+# Monitor directory for new images
+grabtext monitor ./incoming_images -f json
+
+# Process without copying to clipboard
+grabtext process document.png --no-clipboard -o output.txt
+
+# Show what would be processed (dry run)
+grabtext process ./images --dry-run
+```
 
 ### Forcing OCR Language
 
@@ -263,7 +415,26 @@ Common issues and solutions:
 <details>
   <summary><strong>Where can I find logs for debugging?</strong></summary>
   
-  GrabText now generates a log file named `grabtext.log` in the project directory. This log is always in English and has a clean, structured format, which facilitates the identification and debugging of any issues that may arise during the tool's execution. You can consult it for detailed information about the OCR process and other operations.
+  GrabText generates a log file named `grabtext.log` in the project directory. This log is always in English and has a clean, structured format, which facilitates the identification and debugging of any issues that may arise during the tool's execution. You can consult it for detailed information about the OCR process and other operations.
+</details>
+
+<details>
+  <summary><strong>JSON/CSV export not working properly</strong></summary>
+  
+  *   Ensure you have write permissions in the output directory.
+  *   Check if the output file path is valid and accessible.
+  *   For large batches, the process might take time - check the logs for progress.
+  *   Verify that the images contain readable text for meaningful OCR results.
+  *   Use `grabtext --debug` to see detailed processing information.
+</details>
+
+<details>
+  <summary><strong>CSV file appears corrupted or has formatting issues</strong></summary>
+  
+  *   CSV files use proper escaping for text content with commas or quotes.
+  *   Open the CSV file with a text editor first to verify the structure.
+  *   Import into Excel/LibreOffice Calc using "Text to Columns" if needed.
+  *   Check that the text content doesn't contain problematic characters.
 </details>
 
 For more help, run `grabtext help` or check the specific command help with `grabtext <command> --help`. When reporting issues, you can use `grabtext --debug` to get more detailed output that will help diagnose the problem.
