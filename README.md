@@ -235,8 +235,8 @@ This project was developed and tested to work on major Linux desktop environment
 
 1.  **Clone this repository:**
     ```bash
-    git clone https://github.com/rouri404/GrabText.git
-    cd GrabText
+    git clone https://github.com/rouri404/grab-text.git
+    cd grab-text
     ```
 
 2.  **Make the installation script executable:**
