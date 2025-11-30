@@ -20,14 +20,12 @@ from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# Importar sistema de idioma unificado
 try:
-    from lang.strings import get_string, set_language, get_lang_manager
+    from lang.strings import get_string, set_language as set_lang_manager, get_lang_manager
 except ImportError:
-    # Fallback se não conseguir importar strings
     def get_string(key, **kwargs):
         return key.format(**kwargs) if kwargs else key
-    def set_language(lang):
+    def set_lang_manager(lang):
         return False
     class DummyManager:
         def get_available_languages(self):
@@ -35,7 +33,6 @@ except ImportError:
     def get_lang_manager():
         return DummyManager()
 
-# Importar módulos de idioma OCR
 try:
     from lang.ocr_languages import get_tesseract_lang_code, get_language_name, get_available_languages, is_language_supported
 except ImportError:
@@ -48,7 +45,6 @@ except ImportError:
     def is_language_supported(lang):
         return lang in ['pt', 'en']
 
-# Importar processador de imagem
 try:
     from image_processor import ImageProcessor, get_preset_text_enhancement, get_preset_low_quality, CV2_AVAILABLE
 except ImportError:
@@ -57,7 +53,6 @@ except ImportError:
         def preprocess(self, img):
             return img
 
-# Importar motores OCR
 try:
     from ocr_engines import get_ocr_manager
 except ImportError:
@@ -69,7 +64,6 @@ except ImportError:
     def get_ocr_manager():
         return DummyOCRManager()
 
-# Importar validador de texto
 try:
     from text_validator import TextValidator, ConfidenceThresholdManager
 except ImportError:
@@ -92,10 +86,15 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s'
 )
 
-# Funções de configuração devem ser definidas antes de initialize_language()
 def load_config():
     """Carrega configuração do arquivo"""
-    config = {'language': 'pt'}
+    try:
+        from lang.strings import get_system_language
+        default_lang = get_system_language()
+    except:
+        default_lang = 'pt'
+    
+    config = {'language': default_lang}
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
@@ -137,31 +136,26 @@ def save_config(config):
         logging.error(f"Unexpected error saving config: {e}")
         return False
 
-# Inicialização da linguagem deve ser chamada após as funções de configuração
 def initialize_language():
     global current_lang_code, tesseract_lang_code
     config = load_config()
     current_lang_code = os.environ.get('GRABTEXT_LANG', config.get('language', 'pt')).lower()
     tesseract_lang_code = get_tesseract_lang_code(current_lang_code)
     
-    # Configurar idioma no sistema unificado
     try:
-        set_language(current_lang_code)
+        set_lang_manager(current_lang_code)
     except:
-        pass  # Fallback silencioso
+        pass
     
     logging.debug(get_string('MSG_LANGUAGE_INITIALIZED', current_lang_code=current_lang_code, tesseract_lang_code=tesseract_lang_code))
 
-# Inicializar variáveis globais de idioma
-current_lang_code = 'pt'  # Valor padrão
-tesseract_lang_code = 'por'  # Valor padrão
+current_lang_code = 'pt'
+tesseract_lang_code = 'por'
 
-# get_message deve ser definida antes dos dicionários de mensagens que a utilizam
 def get_message(key, **kwargs):
     """Função de compatibilidade com código existente"""
     return get_string(f'MSG_{key.upper()}', **kwargs)
 
-# Dicionários de mensagens devem vir após initialize_language() e get_message()
 LOG_MESSAGES = {
     'SESSION_START': "Session started.",
     'NO_IMAGE_DATA': "No image data received from stdin.",
@@ -1616,15 +1610,15 @@ def main():
     # Argumentos globais
     parser.add_argument('--version', action='version', version=f'GrabText {VERSION}')
     parser.add_argument('--ocr-engine', choices=['tesseract', 'easyocr', 'google_cloud'], 
-                       default='tesseract', help='Motor OCR a ser utilizado')
+                       default='tesseract', help=get_string('MSG_OCR_ENGINE_HELP'))
     parser.add_argument('--preprocessing', choices=['none', 'text_enhancement', 'low_quality', 'handwriting', 'document_scan'], 
-                       default='none', help='Tipo de pré-processamento de imagem')
-    parser.add_argument('--debug', action='store_true', help='Enable debug mode with verbose output')
-    parser.add_argument('--verbose', action='store_true', help='Show detailed progress information')
-    parser.add_argument('--config', action='store_true', help='Show current configuration')
-    parser.add_argument('--dry-run', action='store_true', help='Show what would be done without executing')
+                       default='none', help=get_string('MSG_PREPROCESSING_HELP'))
+    parser.add_argument('--debug', action='store_true', help=get_string('MSG_DEBUG_HELP'))
+    parser.add_argument('--verbose', action='store_true', help=get_string('MSG_VERBOSE_HELP'))
+    parser.add_argument('--config', action='store_true', help=get_string('MSG_CONFIG_HELP'))
+    parser.add_argument('--dry-run', action='store_true', help=get_string('MSG_DRY_RUN_HELP'))
     
-    subparsers = parser.add_subparsers(dest='command', help='Commands', required=False)
+    subparsers = parser.add_subparsers(dest='command', help=get_string('MSG_COMMANDS_HELP'), required=False)
 
     # === COMANDOS PRINCIPAIS ===
     
@@ -1634,16 +1628,16 @@ def main():
         help=ARGPARSE_MESSAGES.get(current_lang_code, ARGPARSE_MESSAGES['en'])['grab_help'],
         usage=ARGPARSE_MESSAGES.get(current_lang_code, ARGPARSE_MESSAGES['en'])['grab_usage']
     )
-    grab_parser.add_argument('--lang', '-l', choices=['pt', 'en'], help='Language for OCR (default: pt)')
-    grab_parser.add_argument('--silent', '-s', action='store_true', help='No notifications')
-    grab_parser.add_argument('--output', '-o', help='Save to file')
-    grab_parser.add_argument('--no-clipboard', action='store_true', help='Don\'t copy to clipboard')
-    grab_parser.add_argument('--dry-run', action='store_true', help='Show what would be done without executing')
-    grab_parser.add_argument('path', nargs='?', help='Image file or directory to process/monitor')
-    grab_parser.add_argument('--format', '-f', choices=['text', 'json', 'csv'], default='text', help='Output format')
-    grab_parser.add_argument('--recursive', '-r', action='store_true', help='Process directory recursively')
-    grab_parser.add_argument('--watch', '-w', action='store_true', help='Monitor directory for new images')
-    grab_parser.add_argument('--batch', '-b', action='store_true', help='Process multiple images')
+    grab_parser.add_argument('--lang', '-l', choices=['pt', 'en'], help=get_string('MSG_LANG_HELP'))
+    grab_parser.add_argument('--silent', '-s', action='store_true', help=get_string('MSG_SILENT_HELP'))
+    grab_parser.add_argument('--output', '-o', help=get_string('MSG_OUTPUT_HELP'))
+    grab_parser.add_argument('--no-clipboard', action='store_true', help=get_string('MSG_NO_CLIPBOARD_HELP'))
+    grab_parser.add_argument('--dry-run', action='store_true', help=get_string('MSG_DRY_RUN_HELP'))
+    grab_parser.add_argument('path', nargs='?', help=get_string('MSG_PATH_HELP'))
+    grab_parser.add_argument('--format', '-f', choices=['text', 'json', 'csv'], default='text', help=get_string('MSG_FORMAT_HELP'))
+    grab_parser.add_argument('--recursive', '-r', action='store_true', help=get_string('MSG_RECURSIVE_HELP'))
+    grab_parser.add_argument('--watch', '-w', action='store_true', help=get_string('MSG_WATCH_HELP'))
+    grab_parser.add_argument('--batch', '-b', action='store_true', help=get_string('MSG_BATCH_HELP'))
 
     # Process command - Processar arquivos existentes
     process_parser = subparsers.add_parser(
@@ -1651,15 +1645,15 @@ def main():
         help=ARGPARSE_MESSAGES.get(current_lang_code, ARGPARSE_MESSAGES['en'])['process_help'],
         usage=ARGPARSE_MESSAGES.get(current_lang_code, ARGPARSE_MESSAGES['en'])['process_usage']
     )
-    process_parser.add_argument('path', help='Image file or directory to process')
-    process_parser.add_argument('--lang', '-l', choices=['pt', 'en'], help='Language for OCR (default: pt)')
-    process_parser.add_argument('--output', '-o', help='Save to file')
-    process_parser.add_argument('--format', '-f', choices=['text', 'json', 'csv'], default='text', help='Output format')
-    process_parser.add_argument('--recursive', '-r', action='store_true', help='Process directory recursively')
-    process_parser.add_argument('--batch', action='store_true', help='Process multiple images')
-    process_parser.add_argument('--silent', '-s', action='store_true', help='No notifications')
-    process_parser.add_argument('--no-clipboard', action='store_true', help='Don\'t copy to clipboard')
-    process_parser.add_argument('--dry-run', action='store_true', help='Show what would be done without executing')
+    process_parser.add_argument('path', help=get_string('MSG_PATH_HELP'))
+    process_parser.add_argument('--lang', '-l', choices=['pt', 'en'], help=get_string('MSG_LANG_HELP'))
+    process_parser.add_argument('--output', '-o', help=get_string('MSG_OUTPUT_HELP'))
+    process_parser.add_argument('--format', '-f', choices=['text', 'json', 'csv'], default='text', help=get_string('MSG_FORMAT_HELP'))
+    process_parser.add_argument('--recursive', '-r', action='store_true', help=get_string('MSG_RECURSIVE_HELP'))
+    process_parser.add_argument('--batch', action='store_true', help=get_string('MSG_BATCH_HELP'))
+    process_parser.add_argument('--silent', '-s', action='store_true', help=get_string('MSG_SILENT_HELP'))
+    process_parser.add_argument('--no-clipboard', action='store_true', help=get_string('MSG_NO_CLIPBOARD_HELP'))
+    process_parser.add_argument('--dry-run', action='store_true', help=get_string('MSG_DRY_RUN_HELP'))
 
     # Monitor command - Monitorar diretórios
     monitor_parser = subparsers.add_parser(
@@ -1667,26 +1661,26 @@ def main():
         help=ARGPARSE_MESSAGES.get(current_lang_code, ARGPARSE_MESSAGES['en'])['monitor_help'],
         usage=ARGPARSE_MESSAGES.get(current_lang_code, ARGPARSE_MESSAGES['en'])['monitor_usage']
     )
-    monitor_parser.add_argument('directory', help='Directory to monitor')
-    monitor_parser.add_argument('--lang', '-l', choices=['pt', 'en'], help='Language for OCR (default: pt)')
-    monitor_parser.add_argument('--recursive', '-r', action='store_true', help='Monitor recursively')
-    monitor_parser.add_argument('--format', '-f', choices=['text', 'json', 'csv'], default='text', help='Output format')
-    monitor_parser.add_argument('--output', '-o', help='Save to file')
-    monitor_parser.add_argument('--silent', '-s', action='store_true', help='No notifications')
-    monitor_parser.add_argument('--no-clipboard', action='store_true', help='Don\'t copy to clipboard')
+    monitor_parser.add_argument('directory', help=get_string('MSG_DIRECTORY_HELP'))
+    monitor_parser.add_argument('--lang', '-l', choices=['pt', 'en'], help=get_string('MSG_LANG_HELP'))
+    monitor_parser.add_argument('--recursive', '-r', action='store_true', help=get_string('MSG_RECURSIVE_HELP'))
+    monitor_parser.add_argument('--format', '-f', choices=['text', 'json', 'csv'], default='text', help=get_string('MSG_FORMAT_HELP'))
+    monitor_parser.add_argument('--output', '-o', help=get_string('MSG_OUTPUT_HELP'))
+    monitor_parser.add_argument('--silent', '-s', action='store_true', help=get_string('MSG_SILENT_HELP'))
+    monitor_parser.add_argument('--no-clipboard', action='store_true', help=get_string('MSG_NO_CLIPBOARD_HELP'))
 
     # === COMANDOS DE UTILIDADE ===
     
     # Logs command
     logs_parser = subparsers.add_parser('logs', help=ARGPARSE_MESSAGES.get(current_lang_code, ARGPARSE_MESSAGES['en'])['logs_help'])
-    logs_parser.add_argument('--show', '-s', action='store_true', help='Show logs')
-    logs_parser.add_argument('--clear', '-c', action='store_true', help='Clear log file')
-    logs_parser.add_argument('--tail', '-t', type=int, default=50, help='Show last N lines')
-    logs_parser.add_argument('--since', '-S', help='Show logs since date (YYYY-MM-DD)')
-    logs_parser.add_argument('--until', '-u', help='Show logs until date (YYYY-MM-DD)')
-    logs_parser.add_argument('--export', '-e', help='Export logs to file')
-    logs_parser.add_argument('--errors', action='store_true', help='Show only errors')
-    logs_parser.add_argument('--filter', '-f', help='Filter logs by text')
+    logs_parser.add_argument('--show', '-s', action='store_true', help=get_string('MSG_SHOW_LOGS_HELP'))
+    logs_parser.add_argument('--clear', '-c', action='store_true', help=get_string('MSG_CLEAR_LOG_HELP'))
+    logs_parser.add_argument('--tail', '-t', type=int, default=50, help=get_string('MSG_TAIL_HELP'))
+    logs_parser.add_argument('--since', '-S', help=get_string('MSG_SINCE_HELP'))
+    logs_parser.add_argument('--until', '-u', help=get_string('MSG_UNTIL_HELP'))
+    logs_parser.add_argument('--export', '-e', help=get_string('MSG_EXPORT_HELP'))
+    logs_parser.add_argument('--errors', action='store_true', help=get_string('MSG_ERRORS_HELP'))
+    logs_parser.add_argument('--filter', '-f', help=get_string('MSG_FILTER_HELP'))
 
     # Status command
     status_parser = subparsers.add_parser('status', help=ARGPARSE_MESSAGES.get(current_lang_code, ARGPARSE_MESSAGES['en'])['status_help'])
