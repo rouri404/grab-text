@@ -9,7 +9,9 @@ import pytesseract
 from PIL import Image
 import os
 import logging
+import threading
 import time
+from collections import defaultdict
 import argparse
 import json
 import csv
@@ -17,6 +19,66 @@ from datetime import datetime
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+
+# Importar sistema de idioma unificado
+try:
+    from lang.strings import get_string, set_language, get_lang_manager
+except ImportError:
+    # Fallback se não conseguir importar strings
+    def get_string(key, **kwargs):
+        return key.format(**kwargs) if kwargs else key
+    def set_language(lang):
+        return False
+    class DummyManager:
+        def get_available_languages(self):
+            return ['pt', 'en']
+    def get_lang_manager():
+        return DummyManager()
+
+# Importar módulos de idioma OCR
+try:
+    from lang.ocr_languages import get_tesseract_lang_code, get_language_name, get_available_languages, is_language_supported
+except ImportError:
+    def get_tesseract_lang_code(lang):
+        return 'por' if lang == 'pt' else 'eng'
+    def get_language_name(lang, interface_lang='pt'):
+        return lang.upper()
+    def get_available_languages():
+        return ['pt', 'en']
+    def is_language_supported(lang):
+        return lang in ['pt', 'en']
+
+# Importar processador de imagem
+try:
+    from image_processor import ImageProcessor, get_preset_text_enhancement, get_preset_low_quality, CV2_AVAILABLE
+except ImportError:
+    CV2_AVAILABLE = False
+    class ImageProcessor:
+        def preprocess(self, img):
+            return img
+
+# Importar motores OCR
+try:
+    from ocr_engines import get_ocr_manager
+except ImportError:
+    class DummyOCRManager:
+        def extract_text(self, img, lang='eng', engine_name=None):
+            return {'text': '', 'word_count': 0, 'char_count': 0, 'avg_confidence': 0, 'language_used': lang, 'has_text': False, 'engine': 'tesseract', 'success': False}
+        def get_engine_info(self):
+            return {'tesseract': {'available': True, 'supported_languages': ['eng', 'por']}}
+    def get_ocr_manager():
+        return DummyOCRManager()
+
+# Importar validador de texto
+try:
+    from text_validator import TextValidator, ConfidenceThresholdManager
+except ImportError:
+    class TextValidator:
+        def validate_text(self, text, ocr_confidence=0.0):
+            return {'text': text, 'is_valid': bool(text), 'final_score': ocr_confidence, 'recommendations': []}
+    class ConfidenceThresholdManager:
+        def get_threshold_level(self, confidence):
+            return 'medium' if confidence > 50 else 'low'
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 LOG_FILE = os.path.join(SCRIPT_DIR, 'grabtext.log')
@@ -36,24 +98,43 @@ def load_config():
     config = {'language': 'pt'}
     if os.path.exists(CONFIG_FILE):
         try:
-            with open(CONFIG_FILE, 'r') as f:
-                for line in f:
-                    if '=' in line:
-                        key, value = line.strip().split('=', 1)
-                        config[key] = value
-        except Exception as e:
-            logging.warning(f"Error loading config: {e}")
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if line and '=' in line:
+                        try:
+                            key, value = line.split('=', 1)
+                            config[key.strip()] = value.strip()
+                        except ValueError:
+                            logging.warning(f"Invalid config format at line {line_num}: {line}")
+        except (IOError, OSError) as e:
+            logging.warning(f"Error reading config file: {e}")
+        except UnicodeDecodeError as e:
+            logging.warning(f"Config file encoding error: {e}")
     return config
 
 def save_config(config):
     """Salva configuração no arquivo"""
     try:
-        with open(CONFIG_FILE, 'w') as f:
+        # Criar backup do arquivo existente
+        if os.path.exists(CONFIG_FILE):
+            backup_file = CONFIG_FILE + '.backup'
+            try:
+                import shutil
+                shutil.copy2(CONFIG_FILE, backup_file)
+            except (IOError, OSError) as e:
+                logging.warning(f"Could not create config backup: {e}")
+        
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             for key, value in config.items():
-                f.write(f"{key}={value}\n")
+                if isinstance(key, str) and isinstance(value, str):
+                    f.write(f"{key.strip()}={value.strip()}\n")
         return True
+    except (IOError, OSError) as e:
+        logging.error(f"Error writing config file: {e}")
+        return False
     except Exception as e:
-        logging.error(f"Error saving config: {e}")
+        logging.error(f"Unexpected error saving config: {e}")
         return False
 
 # Inicialização da linguagem deve ser chamada após as funções de configuração
@@ -61,8 +142,15 @@ def initialize_language():
     global current_lang_code, tesseract_lang_code
     config = load_config()
     current_lang_code = os.environ.get('GRABTEXT_LANG', config.get('language', 'pt')).lower()
-    tesseract_lang_code = 'por' if current_lang_code == 'pt' else 'eng'
-    logging.debug(f"Language initialized: current_lang_code={current_lang_code}, tesseract_lang_code={tesseract_lang_code}")
+    tesseract_lang_code = get_tesseract_lang_code(current_lang_code)
+    
+    # Configurar idioma no sistema unificado
+    try:
+        set_language(current_lang_code)
+    except:
+        pass  # Fallback silencioso
+    
+    logging.debug(get_string('MSG_LANGUAGE_INITIALIZED', current_lang_code=current_lang_code, tesseract_lang_code=tesseract_lang_code))
 
 # Inicializar variáveis globais de idioma
 current_lang_code = 'pt'  # Valor padrão
@@ -70,7 +158,8 @@ tesseract_lang_code = 'por'  # Valor padrão
 
 # get_message deve ser definida antes dos dicionários de mensagens que a utilizam
 def get_message(key, **kwargs):
-    return MESSAGES.get(current_lang_code, MESSAGES['pt']).get(key).format(**kwargs)
+    """Função de compatibilidade com código existente"""
+    return get_string(f'MSG_{key.upper()}', **kwargs)
 
 # Dicionários de mensagens devem vir após initialize_language() e get_message()
 LOG_MESSAGES = {
@@ -537,23 +626,24 @@ def print_help():
 
 def handle_get_lang_command():
     """Mostra o idioma atual"""
-    lang_name = MESSAGES.get(current_lang_code, MESSAGES['en'])['language_name_pt'] if current_lang_code == 'pt' else MESSAGES.get(current_lang_code, MESSAGES['en'])['language_name_en']
-    print(get_message('current_language_status', lang=current_lang_code, lang_name=lang_name))
+    lang_name = get_language_name(current_lang_code, current_lang_code)
+    print(get_string('MSG_CURRENT_LANGUAGE_STATUS', lang=current_lang_code, lang_name=lang_name))
 
 def set_language(lang):
     """Define o idioma globalmente"""
-    if lang not in ['pt', 'en']:
-        return False, f"Idioma inválido: {lang}. Use 'pt' ou 'en'."
+    if not is_language_supported(lang):
+        available = ', '.join(get_available_languages())
+        return False, f"Idioma não suportado: {lang}. Disponíveis: {available}"
     
     config = load_config()
     config['language'] = lang
     if save_config(config):
         global current_lang_code, tesseract_lang_code
         current_lang_code = lang
-        tesseract_lang_code = 'por' if lang == 'pt' else 'eng'
+        tesseract_lang_code = get_tesseract_lang_code(lang)
         # Re-inicializar logging para usar o novo idioma
         initialize_language()
-        return True, f"Idioma definido para {lang}"
+        return True, get_string('MSG_LANGUAGE_SET_SUCCESS', lang=lang)
     else:
         return False, "Erro ao salvar configuração"
 
@@ -562,18 +652,20 @@ def handle_set_lang_command(args):
     if args.language:
         success, msg = set_language(args.language)
         if success:
-            print(get_message('language_set_success', lang=args.language))
+            lang_name = get_language_name(args.language, args.language)
+            print(get_string('MSG_LANGUAGE_SET_SUCCESS', lang=args.language))
             if not args.silent:
                 send_notification(
-                    get_message('language_changed_title'),
-                    get_message('language_set_success', lang=args.language),
+                    get_string('MSG_LANGUAGE_CHANGED_TITLE'),
+                    get_string('MSG_LANGUAGE_SET_SUCCESS', lang=args.language),
                     icon_name="preferences-system-time"
                 )
         else:
-            print(get_message('error_prefix', message=msg))
+            print(get_string('MSG_ERROR_PREFIX', message=msg))
     else:
-        print(get_message('set_lang_usage'))
-        print(get_message('available_languages'))
+        available = ', '.join(get_available_languages())
+        print(f"Uso: grabtext set-lang <idioma>")
+        print(f"Idiomas disponíveis: {available}")
 
 def send_notification(title, message, icon_name="", expire_timeout=5000):
     cmd = ['notify-send', '-a', 'GrabText', title, message, '-t', str(expire_timeout)]
@@ -606,79 +698,258 @@ def copy_to_clipboard(text):
     except (FileNotFoundError, subprocess.CalledProcessError) as e:
         logging.error(f"{LOG_MESSAGES['CLIPBOARD_ERROR']} Details: {str(e)}")
         send_notification(
-            get_message('grabtext_error_title'),
-            get_message('error_clipboard_install'),
-            icon_name="error"
-        )
+                get_string('MSG_GRABTEXT_ERROR_TITLE'),
+                get_string('MSG_ERROR_CLIPBOARD_INSTALL'),
+                icon_name="dialog-error"
+            )
         return False
 
 class ImageHandler(FileSystemEventHandler):
     def __init__(self, process_func):
         self.process_func = process_func
+        self.processing_files = set()  # Arquivos sendo processados
+        self.file_lock = threading.Lock()
+        self.file_sizes = defaultdict(int)  # Tamanhos dos arquivos para detectar quando estão completos
+        
+    def _is_file_ready(self, file_path):
+        """Verifica se o arquivo está pronto para processamento"""
+        try:
+            # Verificar se o arquivo ainda está sendo escrito
+            current_size = os.path.getsize(file_path)
+            
+            # Se o tamanho mudou recentemente, ainda pode estar sendo escrito
+            with self.file_lock:
+                last_size = self.file_sizes[file_path]
+                self.file_sizes[file_path] = current_size
+                
+                # Se é a primeira verificação ou o tamanho mudou, esperar
+                if last_size == 0 or current_size != last_size:
+                    return False
+            
+            # Verificar se o arquivo pode ser aberto em modo exclusivo
+            try:
+                with open(file_path, 'rb') as f:
+                    f.read(1)  # Tentar ler um byte
+                return True
+            except (IOError, OSError):
+                return False
+                
+        except (IOError, OSError):
+            return False
+    
+    def _wait_for_file_completion(self, file_path, max_wait=5):
+        """Espera até que o arquivo esteja completo"""
+        wait_time = 0
+        check_interval = 0.5
+        
+        while wait_time < max_wait:
+            if self._is_file_ready(file_path):
+                return True
+            time.sleep(check_interval)
+            wait_time += check_interval
+        
+        logging.warning(f"File {file_path} may still be being written after {max_wait}s")
+        return False
 
     def on_created(self, event):
         if not event.is_directory and event.src_path.lower().endswith(('.png', '.jpg', '.jpeg')):
-            self.process_func(event.src_path)
+            # Evitar processamento duplicado
+            with self.file_lock:
+                if event.src_path in self.processing_files:
+                    return
+                self.processing_files.add(event.src_path)
+            
+            try:
+                # Esperar o arquivo estar completo
+                if self._wait_for_file_completion(event.src_path):
+                    logging.debug(f"Processing file: {event.src_path}")
+                    self.process_func(event.src_path)
+                else:
+                    logging.warning(f"Skipping incomplete file: {event.src_path}")
+            except Exception as e:
+                logging.error(f"Error processing file {event.src_path}: {e}")
+            finally:
+                # Limpar do conjunto de processamento
+                with self.file_lock:
+                    self.processing_files.discard(event.src_path)
+                    # Limpar do registro de tamanhos após algum tempo
+                    threading.Timer(10.0, lambda: self.file_sizes.pop(event.src_path, None)).start()
+
+def validate_image_path(image_path):
+    """Valida se o caminho é uma imagem válida"""
+    if not image_path or not isinstance(image_path, str):
+        return False, get_string('MSG_INVALID_PATH_PROVIDED')
+    
+    # Verificar se o arquivo existe
+    if not os.path.exists(image_path):
+        return False, get_string('MSG_FILE_NOT_FOUND', path=image_path)
+    
+    # Verificar se é um arquivo (não diretório)
+    if not os.path.isfile(image_path):
+        return False, get_string('MSG_PATH_NOT_FILE', path=image_path)
+    
+    # Verificar extensão
+    valid_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.gif', '.webp'}
+    file_ext = os.path.splitext(image_path)[1].lower()
+    if file_ext not in valid_extensions:
+        return False, get_string('MSG_UNSUPPORTED_IMAGE_FORMAT', format=file_ext)
+    
+    # Verificar se o arquivo pode ser aberto como imagem
+    try:
+        with Image.open(image_path) as img:
+            # Verificar dimensões mínimas
+            if img.width < 1 or img.height < 1:
+                return False, "Invalid image dimensions"
+            
+            # Verificar tamanho máximo (50MB)
+            file_size = os.path.getsize(image_path)
+            if file_size > 50 * 1024 * 1024:  # 50MB
+                return False, get_string('MSG_IMAGE_TOO_LARGE', size=file_size / (1024*1024))
+            
+        return True, "Valid image file"
+        
+    except (IOError, OSError, Image.UnidentifiedImageError) as e:
+        return False, get_string('MSG_CANNOT_READ_IMAGE', error=e)
+    except Exception as e:
+        return False, f"Unexpected error validating image: {e}"
+
+def validate_directory_path(dir_path):
+    """Valida se o caminho é um diretório válido"""
+    if not dir_path or not isinstance(dir_path, str):
+        return False, get_string('MSG_INVALID_PATH_PROVIDED')
+    
+    # Verificar se o diretório existe
+    if not os.path.exists(dir_path):
+        return False, get_string('MSG_DIRECTORY_NOT_FOUND', path=dir_path)
+    
+    # Verificar se é um diretório
+    if not os.path.isdir(dir_path):
+        return False, get_string('MSG_PATH_NOT_DIRECTORY', path=dir_path)
+    
+    # Verificar permissões de leitura
+    if not os.access(dir_path, os.R_OK):
+        return False, get_string('MSG_NO_READ_PERMISSION', path=dir_path)
+    
+    return True, "Valid directory"
+
+def validate_output_path(output_path):
+    """Valida se o caminho de saída é válido"""
+    if not output_path or not isinstance(output_path, str):
+        return False, get_string('MSG_INVALID_PATH_PROVIDED')
+    
+    try:
+        # Verificar se o diretório pai existe e tem permissão de escrita
+        parent_dir = os.path.dirname(os.path.abspath(output_path))
+        if parent_dir and not os.path.exists(parent_dir):
+            return False, get_string('MSG_DIRECTORY_NOT_FOUND', path=parent_dir)
+        
+        if parent_dir and not os.access(parent_dir, os.W_OK):
+            return False, get_string('MSG_NO_WRITE_PERMISSION', path=parent_dir)
+        
+        # Verificar se o arquivo já existe e se pode ser sobrescrito
+        if os.path.exists(output_path):
+            if not os.access(output_path, os.W_OK):
+                return False, get_string('MSG_CANNOT_OVERWRITE_FILE', path=output_path)
+        
+        return True, "Valid output path"
+        
+    except Exception as e:
+        return False, f"Error validating output path: {e}"
 
 def get_image_metadata(image_path, img=None):
-    """Extrai metadados da imagem"""
     try:
         if img is None:
-            img = Image.open(image_path)
+            try:
+                img = Image.open(image_path)
+            except (IOError, OSError) as e:
+                logging.error(f"Cannot open image {image_path}: {e}")
+                return {
+                    'filename': os.path.basename(image_path),
+                    'filepath': os.path.abspath(image_path),
+                    'error': f'Cannot open image: {e}'
+                }
         
         # Obter informações do arquivo
-        file_stats = os.stat(image_path)
+        try:
+            file_stats = os.stat(image_path)
+        except (IOError, OSError) as e:
+            logging.warning(f"Cannot get file stats for {image_path}: {e}")
+            file_stats = None
         
         metadata = {
             'filename': os.path.basename(image_path),
             'filepath': os.path.abspath(image_path),
-            'file_size_bytes': file_stats.st_size,
-            'file_modified': datetime.fromtimestamp(file_stats.st_mtime).isoformat(),
             'image_width': img.width,
             'image_height': img.height,
             'image_format': img.format,
             'image_mode': img.mode
         }
         
+        if file_stats:
+            metadata.update({
+                'file_size_bytes': file_stats.st_size,
+                'file_modified': datetime.fromtimestamp(file_stats.st_mtime).isoformat()
+            })
+        
         return metadata
-    except Exception as e:
-        logging.warning(f"Could not extract metadata for {image_path}: {e}")
+        
+    except AttributeError as e:
+        logging.error(f"Invalid image object for {image_path}: {e}")
         return {
             'filename': os.path.basename(image_path),
             'filepath': os.path.abspath(image_path),
-            'error': str(e)
+            'error': f'Invalid image object: {e}'
+        }
+    except Exception as e:
+        logging.error(f"Unexpected error getting metadata for {image_path}: {e}")
+        return {
+            'filename': os.path.basename(image_path),
+            'filepath': os.path.abspath(image_path),
+            'error': f'Unexpected error: {e}'
         }
 
 def get_ocr_data(img, lang_code):
     """Extrai dados OCR com informações de confiança"""
     try:
-        # Obter dados OCR com confiança
-        data = pytesseract.image_to_data(img, lang=lang_code, output_type=pytesseract.Output.DICT)
+        # Validar objeto de imagem
+        if not hasattr(img, 'width') or not hasattr(img, 'height'):
+            raise ValueError("Invalid image object provided")
         
-        # Extrair texto
-        text = pytesseract.image_to_string(img, lang=lang_code).strip()
+        # Usar gerenciador de motores OCR
+        ocr_manager = get_ocr_manager()
+        engine_name = getattr(ocr_manager, 'default_engine', 'tesseract')
         
-        # Calcular confiança média
-        confidences = [int(conf) for conf in data['conf'] if int(conf) > 0]
-        avg_confidence = sum(confidences) / len(confidences) if confidences else 0
+        # Obter dados OCR usando o motor disponível
+        ocr_result = ocr_manager.extract_text(img, lang_code, engine_name)
         
-        # Contar palavras e caracteres
-        word_count = len([word for word in data['text'] if word.strip()])
-        char_count = len(text)
+        if ocr_result.get('success', False):
+            return {
+                'text': ocr_result.get('text', ''),
+                'word_count': ocr_result.get('word_count', 0),
+                'char_count': ocr_result.get('char_count', 0),
+                'avg_confidence': ocr_result.get('avg_confidence', 0),
+                'language_used': lang_code,
+                'has_text': ocr_result.get('has_text', False),
+                'processing_timestamp': datetime.now().isoformat(),
+                'engine_used': ocr_result.get('engine', 'tesseract')
+            }
+        else:
+            error_msg = ocr_result.get('error', 'Unknown OCR error')
+            logging.error(f"OCR processing failed: {error_msg}")
+            return {
+                'text': '',
+                'word_count': 0,
+                'char_count': 0,
+                'avg_confidence': 0,
+                'language_used': lang_code,
+                'has_text': False,
+                'processing_timestamp': datetime.now().isoformat(),
+                'error': error_msg,
+                'engine_used': ocr_result.get('engine', 'tesseract')
+            }
         
-        ocr_info = {
-            'text': text,
-            'word_count': word_count,
-            'char_count': char_count,
-            'avg_confidence': round(avg_confidence, 2),
-            'language_used': lang_code,
-            'has_text': bool(text),
-            'processing_timestamp': datetime.now().isoformat()
-        }
-        
-        return ocr_info
-    except Exception as e:
-        logging.error(f"OCR processing error: {e}")
+    except ValueError as e:
+        logging.error(f"Invalid input for OCR: {e}")
         return {
             'text': '',
             'word_count': 0,
@@ -687,18 +958,60 @@ def get_ocr_data(img, lang_code):
             'language_used': lang_code,
             'has_text': False,
             'processing_timestamp': datetime.now().isoformat(),
-            'error': str(e)
+            'error': f'Input validation error: {e}'
+        }
+    except Exception as e:
+        logging.error(f"Unexpected OCR error: {e}")
+        return {
+            'text': '',
+            'word_count': 0,
+            'char_count': 0,
+            'avg_confidence': 0,
+            'language_used': lang_code,
+            'has_text': False,
+            'processing_timestamp': datetime.now().isoformat(),
+            'error': f'Unexpected error: {e}'
         }
 
-def process_image_file(image_path, format='text'):
+def process_image_file(image_path, format='text', preprocessing='none'):
     try:
         img = Image.open(image_path)
+        
+        # Aplicar pré-processamento se solicitado
+        if preprocessing != 'none' and CV2_AVAILABLE:
+            processor = ImageProcessor()
+            
+            if preprocessing == 'text_enhancement':
+                processor = get_preset_text_enhancement()
+            elif preprocessing == 'low_quality':
+                processor = get_preset_low_quality()
+            elif preprocessing == 'handwriting':
+                from image_processor import get_preset_handwriting
+                processor = get_preset_handwriting()
+            elif preprocessing == 'document_scan':
+                from image_processor import get_preset_document_scan
+                processor = get_preset_document_scan()
+            
+            try:
+                img = processor.preprocess(img)
+                logging.debug(f"Applied {preprocessing} preprocessing to {image_path}")
+            except Exception as e:
+                logging.warning(f"Preprocessing failed for {image_path}: {e}")
         
         # Obter metadados da imagem
         metadata = get_image_metadata(image_path, img)
         
         # Obter dados OCR
         ocr_data = get_ocr_data(img, tesseract_lang_code)
+        
+        # Validar texto extraído
+        validator = TextValidator(current_lang_code)
+        validation_result = validator.validate_text(ocr_data.get('text', ''), ocr_data.get('avg_confidence', 0))
+        
+        # Adicionar informações de validação ao resultado
+        ocr_data['validation'] = validation_result
+        ocr_data['final_confidence'] = validation_result.get('final_score', ocr_data.get('avg_confidence', 0))
+        ocr_data['is_text_valid'] = validation_result.get('is_valid', True)
         
         if format == 'json':
             result = {
@@ -884,24 +1197,35 @@ def handle_status_command():
         print(STATUS_MESSAGES.get(current_lang_code, STATUS_MESSAGES['en'])['no_display_warning'])
 
 def process_single_image(image_path, args):
-    if not os.path.exists(image_path):
-        logging.error(get_message('path_not_found', path=image_path))
-        print(get_message('error_prefix', message=get_message('path_not_found', path=image_path)))
+    # Validar entrada
+    is_valid, error_msg = validate_image_path(image_path)
+    if not is_valid:
+        logging.error(f"Invalid image path: {error_msg}")
+        print(get_string('MSG_ERROR_PREFIX', message=error_msg))
         return
+    
+    # Validar caminho de saída se fornecido
+    if args.output:
+        output_valid, output_error = validate_output_path(args.output)
+        if not output_valid:
+            logging.error(f"Invalid output path: {output_error}")
+            print(get_string('MSG_ERROR_PREFIX', message=output_error))
+            return
 
     if args.dry_run:
-        print(f"Dry run: Would process image '{image_path}'")
+        print(get_string('MSG_DRY_RUN_WOULD_PROCESS_IMAGE', path=image_path))
         return
 
     if not args.silent:
         send_notification(
-            get_message('processing_image_title'),
-            get_message('processing_image_content'),
+            get_string('MSG_PROCESSING_IMAGE_TITLE'),
+            get_string('MSG_PROCESSING_IMAGE_CONTENT'),
             icon_name="image-x-generic"
         )
 
     try:
-        extracted_text = process_image_file(image_path, args.format)
+        extracted_text = process_image_file(image_path, args.format if hasattr(args, 'format') else 'text', 
+                                   args.preprocessing if hasattr(args, 'preprocessing') else 'none')
 
         if extracted_text:
             if args.output:
@@ -909,8 +1233,8 @@ def process_single_image(image_path, args):
                     f.write(extracted_text)
                 if not args.silent:
                     send_notification(
-                        get_message('text_saved_title'),
-                        get_message('text_saved_content', path=os.path.abspath(args.output)),
+                        get_string('MSG_TEXT_SAVED_TITLE'),
+                        get_string('MSG_TEXT_SAVED_CONTENT', path=os.path.abspath(args.output)),
                         icon_name="document-save"
                     )
             
@@ -918,16 +1242,16 @@ def process_single_image(image_path, args):
                 copy_to_clipboard(extracted_text)
                 if not args.silent:
                     send_notification(
-                        get_message('text_extracted_title'),
-                        get_message('text_extracted_content', preview=extracted_text[:100].replace('\n', ' ')),
-                        icon_name="edit-paste"
+                        get_string('MSG_TEXT_EXTRACTED_TITLE'),
+                        get_string('MSG_TEXT_EXTRACTED_CONTENT', preview=extracted_text[:100].replace('\n', ' ')),
+                        icon_name="text-x-generic"
                     )
             print(extracted_text)
         else:
             if not args.silent:
                 send_notification(
-                    get_message('no_text_detected_title'),
-                    get_message('no_text_detected_content'),
+                    get_string('MSG_NO_TEXT_DETECTED_TITLE'),
+                    get_string('MSG_NO_TEXT_DETECTED_CONTENT'),
                     icon_name="dialog-warning"
                 )
             logging.info(LOG_MESSAGES['OCR_NO_TEXT'])
@@ -935,22 +1259,28 @@ def process_single_image(image_path, args):
         logging.error(LOG_MESSAGES['UNEXPECTED_ERROR'].format(e=e))
         if not args.silent:
             send_notification(
-                get_message('unexpected_error_title'),
-                get_message('unexpected_error_content', preview=str(e)[:100].replace('\n', ' ')),
+                get_string('MSG_UNEXPECTED_ERROR_TITLE'),
+                get_string('MSG_UNEXPECTED_ERROR_CONTENT', preview=str(e)[:100].replace('\n', ' ')),
                 icon_name="dialog-error"
             )
 
 def handle_process_command(args):
-    if not os.path.exists(args.path):
-        logging.error(get_message('path_not_found', path=args.path))
-        print(get_message('error_prefix', message=get_message('path_not_found', path=args.path)))
+    # Validar entrada
+    is_valid, error_msg = validate_directory_path(args.path) if os.path.isdir(args.path) else validate_image_path(args.path)
+    if not is_valid:
+        logging.error(f"Invalid path: {error_msg}")
+        print(get_string('MSG_ERROR_PREFIX', message=error_msg))
         return
 
     if args.lang:
         global current_lang_code, tesseract_lang_code
-        current_lang_code = args.lang
-        tesseract_lang_code = 'por' if current_lang_code == 'pt' else 'eng'
-        logging.debug(f"Language overridden for process command: {current_lang_code}")
+        if is_language_supported(args.lang):
+            current_lang_code = args.lang
+            tesseract_lang_code = get_tesseract_lang_code(args.lang)
+            logging.debug(get_string('MSG_LANGUAGE_OVERRIDDEN_FOR_PROCESS', current_lang_code=current_lang_code))
+        else:
+            print(f"Idioma não suportado: {args.lang}")
+            return
 
     if os.path.isfile(args.path):
         process_single_image(args.path, args)
@@ -968,51 +1298,57 @@ def handle_process_command(args):
                         f.write(full_output)
                     if not args.silent:
                         send_notification(
-                            get_message('batch_complete_title'),
-                            get_message('text_saved_content', path=os.path.abspath(args.output)),
+                            get_string('MSG_BATCH_COMPLETE_TITLE'),
+                            get_string('MSG_TEXT_SAVED_CONTENT', path=os.path.abspath(args.output)),
                             icon_name="document-save"
                         )
                 except Exception as e:
-                    logging.error(get_message('file_save_error', error=str(e)))
-                    print(get_message('error_prefix', message=get_message('file_save_error', error=str(e))))
+                    logging.error(get_string('MSG_FILE_SAVE_ERROR', error=str(e)))
+                    print(get_string('MSG_ERROR_PREFIX', message=get_string('MSG_FILE_SAVE_ERROR', error=str(e))))
             
             if not args.no_clipboard:
                 copy_to_clipboard(full_output)
                 if not args.silent:
                     send_notification(
-                        get_message('batch_complete_title'),
-                        get_message('text_extracted_content', preview=full_output[:100].replace('\n', ' ')),
-                        icon_name="edit-paste"
+                        get_string('MSG_TEXT_EXTRACTED_TITLE'),
+                        get_string('MSG_TEXT_EXTRACTED_CONTENT', preview=full_output[:100].replace('\n', ' ')),
+                        icon_name="text-x-generic"
                     )
             print(full_output)
 
         if not args.silent:
             send_notification(
-                get_message('batch_complete_title'),
-                get_message('batch_complete_content', count=len(results), path=args.path),
+                get_string('MSG_BATCH_COMPLETE_TITLE'),
+                get_string('MSG_BATCH_COMPLETE_CONTENT', count=len(results), path=args.path),
                 icon_name="document-multiple"
             )
     else:
-        logging.error(get_message('path_not_found', path=args.path))
-        print(get_message('error_prefix', message=get_message('path_not_found', path=args.path)))
+        print(get_string('MSG_PATH_NOT_FOUND', path=args.path))
+    print(get_string('MSG_ERROR_PREFIX', message=get_string('MSG_PATH_NOT_FOUND', path=args.path)))
 
 def handle_monitor_command(args):
-    if not os.path.isdir(args.directory):
-        logging.error(get_message('path_not_found', path=args.directory))
-        print(get_message('error_prefix', message=get_message('path_not_found', path=args.directory)))
+    # Validar diretório
+    is_valid, error_msg = validate_directory_path(args.directory)
+    if not is_valid:
+        logging.error(f"Invalid directory: {error_msg}")
+        print(get_string('MSG_ERROR_PREFIX', message=error_msg))
         return
 
     if args.lang:
         global current_lang_code, tesseract_lang_code
-        current_lang_code = args.lang
-        tesseract_lang_code = 'por' if current_lang_code == 'pt' else 'eng'
-        logging.debug(f"Language overridden for monitor command: {current_lang_code}")
+        if is_language_supported(args.lang):
+            current_lang_code = args.lang
+            tesseract_lang_code = get_tesseract_lang_code(args.lang)
+            logging.debug(get_string('MSG_LANGUAGE_OVERRIDDEN_FOR_MONITOR', current_lang_code=current_lang_code))
+        else:
+            print(f"Idioma não suportado: {args.lang}")
+            return
 
-    print(get_message('watching_directory_content', path=args.directory))
+    print(get_string('MSG_WATCHING_DIRECTORY_CONTENT', path=args.directory))
     if not args.silent:
         send_notification(
-            get_message('watching_directory_title'),
-            get_message('watching_directory_content', path=args.directory),
+            get_string('MSG_WATCHING_DIRECTORY_TITLE'),
+            get_string('MSG_WATCHING_DIRECTORY_CONTENT', path=args.directory),
             icon_name="folder-open"
         )
 
@@ -1051,8 +1387,8 @@ def handle_grab_command(args):
 
         if not args.silent:
             send_notification(
-                get_message('processing_image_title'),
-                get_message('processing_image_content'),
+                get_string('MSG_PROCESSING_IMAGE_TITLE'),
+                get_string('MSG_PROCESSING_IMAGE_CONTENT'),
                 icon_name="image-x-generic"
             )
 
@@ -1069,19 +1405,23 @@ def handle_grab_command(args):
                     logging.error(f"Flameshot error: {error_message}")
                     if not args.silent:
                         send_notification(
-                            get_message('grabtext_error_title'),
-                            get_message('unexpected_error_content', preview=error_message[:100]),
+                            get_string('MSG_GRABTEXT_ERROR_TITLE'),
+                            get_string('MSG_GRABTEXT_ERROR_CONTENT', preview=error_message[:100]),
                             icon_name="dialog-error"
                         )
                 return
 
             # If no image data received on stdout, fallback to temp file approach
             if not image_data:
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
-                    temp_path = tmp_file.name
+                temp_path = None
                 try:
+                    # Criar arquivo temporário com contexto seguro
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.png', prefix='grabtext_') as tmp_file:
+                        temp_path = tmp_file.name
+                    
                     fallback_proc = subprocess.Popen(['flameshot', 'gui', '-p', temp_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     _, fb_stderr = fallback_proc.communicate()
+                    
                     if fallback_proc.returncode != 0:
                         error_message = fb_stderr.decode('utf-8').strip()
                         if "User cancelled" in error_message or "Operação cancelada pelo usuário" in error_message:
@@ -1090,28 +1430,40 @@ def handle_grab_command(args):
                             logging.error(f"Flameshot error (fallback): {error_message}")
                             if not args.silent:
                                 send_notification(
-                                    get_message('grabtext_error_title'),
-                                    get_message('unexpected_error_content', preview=error_message[:100]),
+                                    get_string('MSG_GRABTEXT_ERROR_TITLE'),
+                                    get_string('MSG_GRABTEXT_ERROR_CONTENT', preview=error_message[:100]),
                                     icon_name="dialog-error"
                                 )
                         return
 
-                    if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
+                    # Verificar se o arquivo foi criado e tem conteúdo
+                    if not temp_path or not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
                         logging.warning(LOG_MESSAGES['NO_IMAGE_DATA'])
                         return
 
-                    with open(temp_path, 'rb') as f:
-                        image_data = f.read()
-                finally:
+                    # Ler dados do arquivo temporário
                     try:
-                        if os.path.exists(temp_path):
+                        with open(temp_path, 'rb') as f:
+                            image_data = f.read()
+                    except (IOError, OSError) as e:
+                        logging.error(f"Error reading temp file {temp_path}: {e}")
+                        return
+                        
+                except (subprocess.SubprocessError, OSError) as e:
+                    logging.error(f"Error creating temp file: {e}")
+                    return
+                finally:
+                    # Limpeza garantida do arquivo temporário
+                    if temp_path and os.path.exists(temp_path):
+                        try:
                             os.remove(temp_path)
-                    except Exception:
-                        pass
+                            logging.debug(f"Cleaned up temp file: {temp_path}")
+                        except (IOError, OSError) as e:
+                            logging.warning(f"Could not remove temp file {temp_path}: {e}")
 
             img = Image.open(io.BytesIO(image_data))
             lang_code_to_use = args.lang if args.lang else current_lang_code
-            tesseract_lang_code_to_use = 'por' if lang_code_to_use == 'pt' else 'eng'
+            tesseract_lang_code_to_use = get_tesseract_lang_code(lang_code_to_use)
 
             extracted_text = pytesseract.image_to_string(img, lang=tesseract_lang_code_to_use)
             extracted_text = extracted_text.strip()
@@ -1124,36 +1476,22 @@ def handle_grab_command(args):
                             f.write(extracted_text)
                         if not args.silent:
                             send_notification(
-                                get_message('text_saved_title'),
-                                get_message('text_saved_content', path=os.path.abspath(args.output)),
+                                get_string('MSG_TEXT_SAVED_TITLE'),
+                                get_string('MSG_TEXT_SAVED_CONTENT', path=os.path.abspath(args.output)),
                                 icon_name="document-save"
                             )
                     except Exception as e:
-                        logging.error(get_message('file_save_error', error=str(e)))
-                        print(get_message('error_prefix', message=get_message('file_save_error', error=str(e))))
+                        logging.error(get_string('MSG_FILE_SAVE_ERROR', error=str(e)))
+                        print(get_string('MSG_ERROR_PREFIX', message=get_string('MSG_FILE_SAVE_ERROR', error=str(e))))
                 
                 if not args.no_clipboard:
                     copy_to_clipboard(extracted_text)
                     if not args.silent:
                         send_notification(
-                            get_message('text_extracted_title'),
-                            get_message('text_extracted_content', preview=extracted_text[:100].replace('\n', ' ')),
-                            icon_name="edit-paste"
+                            get_string('MSG_TEXT_EXTRACTED_TITLE'),
+                            get_string('MSG_TEXT_EXTRACTED_CONTENT', preview=extracted_text[:100].replace('\n', ' ')),
+                            icon_name="text-x-generic"
                         )
-                print(extracted_text)
-            else:
-                logging.info(LOG_MESSAGES['OCR_NO_TEXT'])
-                if not args.silent:
-                    send_notification(
-                        get_message('no_text_detected_title'),
-                        get_message('no_text_detected_content'),
-                        icon_name="dialog-warning"
-                    )
-        except FileNotFoundError:
-            error_msg = "Flameshot not found. Please install Flameshot for screen capture functionality."
-            logging.error(error_msg)
-            print(get_message('error_prefix', message=error_msg))
-            if not args.silent:
                 send_notification(
                     get_message('grabtext_error_title'),
                     get_message('unexpected_error_content', preview=error_msg),
@@ -1195,16 +1533,16 @@ def print_logs_help():
 def handle_logs(args):
     """Gerencia arquivos de log"""
     if not os.path.exists(LOG_FILE):
-        print(get_message('no_log_file_found'))
+        print(get_string('MSG_NO_LOG_FILE_FOUND'))
         return
     
     if args.clear:
         try:
             with open(LOG_FILE, 'w') as f:
                 f.write('')
-            print(get_message('log_file_cleared'))
+            print(get_string('MSG_LOG_FILE_CLEARED'))
         except Exception as e:
-            print(get_message('error_prefix', message=f"Erro ao limpar log: {e}"))
+            print(get_string('MSG_ERROR_PREFIX', message=f"Erro ao limpar log: {e}"))
         return
     
     try:
@@ -1253,16 +1591,16 @@ def handle_logs(args):
             try:
                 with open(args.export, 'w') as f:
                     f.writelines(lines)
-                print(get_message('logs_exported_to', export=args.export))
+                print(get_string('MSG_LOGS_EXPORTED_TO', export=args.export))
             except Exception as e:
-                print(get_message('error_prefix', message=f"Erro ao exportar: {e}"))
+                print(get_string('MSG_ERROR_PREFIX', message=f"Erro ao exportar: {e}"))
         else:
             # Mostrar logs
             for line in lines:
                 print(line.rstrip())
     
     except Exception as e:
-        print(get_message('error_prefix', message=f"Erro ao ler logs: {e}"))
+        print(get_string('MSG_ERROR_PREFIX', message=f"Erro ao ler logs: {e}"))
 
 def main():
     
@@ -1277,6 +1615,10 @@ def main():
     
     # Argumentos globais
     parser.add_argument('--version', action='version', version=f'GrabText {VERSION}')
+    parser.add_argument('--ocr-engine', choices=['tesseract', 'easyocr', 'google_cloud'], 
+                       default='tesseract', help='Motor OCR a ser utilizado')
+    parser.add_argument('--preprocessing', choices=['none', 'text_enhancement', 'low_quality', 'handwriting', 'document_scan'], 
+                       default='none', help='Tipo de pré-processamento de imagem')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode with verbose output')
     parser.add_argument('--verbose', action='store_true', help='Show detailed progress information')
     parser.add_argument('--config', action='store_true', help='Show current configuration')
@@ -1408,10 +1750,10 @@ def main():
             handle_grab_command(grab_args)
             return
     except argparse.ArgumentError as e:
-        print(get_message('invalid_command_error'))
-        print(get_message('examples_header'))
-        print(get_message('grab_example'))
-        print(get_message('process_image_example'))
+        print(get_string('MSG_INVALID_COMMAND_ERROR'))
+        print(get_string('MSG_EXAMPLES_HEADER'))
+        print(get_string('MSG_GRAB_EXAMPLE'))
+        print(get_string('MSG_PROCESS_IMAGE_EXAMPLE'))
         return
 
     if args.command == 'help':
